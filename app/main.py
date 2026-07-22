@@ -3,14 +3,16 @@ import asyncio
 import json
 import shutil
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import scraper
+from . import db, scraper
 from .ao3_client import AO3Client, AO3Error
+from .bootstrap import apply_password_reset, seed_admin
 from .config import Settings
 from .downloader import (
     METADATA_FILE,
@@ -64,6 +66,16 @@ async def lifespan(app: FastAPI):
     settings.downloads_dir.mkdir(parents=True, exist_ok=True)
     settings.config_dir.mkdir(parents=True, exist_ok=True)
     _migrate_metadata(settings, bus)
+
+    db.init_db(settings.db_path)
+    seed_admin(settings.db_path)
+    apply_password_reset(settings.db_path)
+    now = datetime.now(timezone.utc)
+    db.purge_expired_sessions(settings.db_path, now.isoformat())
+    db.purge_oidc_states(
+        settings.db_path, (now - timedelta(seconds=settings.oidc_state_ttl)).isoformat()
+    )
+
     manager.start()
 
     app.state.settings = settings

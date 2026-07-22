@@ -3,6 +3,9 @@ downloads/*
 !downloads/.gitkeep
 config/*
 !config/.gitkeep
+app.db
+app.db-wal
+app.db-shm
 __pycache__/
 *.pyc
 .venv/
