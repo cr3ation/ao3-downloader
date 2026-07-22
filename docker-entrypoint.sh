@@ -19,13 +19,26 @@ if [ "$(id -u)" != "0" ]; then
     exec "$@"
 fi
 
-groupmod -o -g "$PGID" appuser
-usermod -o -u "$PUID" -g "$PGID" appuser
+# Reuse an existing group with that GID (e.g. 100 = "users" on most NAS boxes)
+# rather than renumbering ours into a duplicate.
+if getent group "$PGID" >/dev/null 2>&1; then
+    RUN_GROUP=$(getent group "$PGID" | cut -d: -f1)
+else
+    groupmod -o -g "$PGID" appuser
+    RUN_GROUP=appuser
+fi
+usermod -o -u "$PUID" -g "$RUN_GROUP" appuser
 
 # config is ours; downloads may hold thousands of files shared with Calibre,
 # so only the directory itself is adjusted, never its contents.
-chown -R appuser:appuser /app/config 2>/dev/null || true
-chown appuser:appuser /app/downloads 2>/dev/null || true
+chown -R "$PUID:$PGID" /app/config 2>/dev/null || true
+chown "$PUID:$PGID" /app/downloads 2>/dev/null || true
+
+# Fail loudly here rather than with an opaque traceback from uvicorn.
+if ! gosu appuser test -r /app/app/main.py; then
+    echo "[entrypoint] ERROR: uid $PUID cannot read /app/app — rebuild the image (docker compose up -d --build)." >&2
+    exit 1
+fi
 
 echo "[entrypoint] Starting as appuser (uid=$PUID gid=$PGID, TZ=$TZ)."
 exec gosu appuser "$@"

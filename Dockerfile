@@ -22,7 +22,11 @@ COPY app/ ./app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p /app/downloads /app/config && chown -R appuser:appuser /app
+RUN mkdir -p /app/downloads /app/config \
+    && chown -R appuser:appuser /app \
+    # PUID may be any uid, and COPY preserves whatever modes the build host had,
+    # so make the code readable regardless of who ends up running it.
+    && chmod -R a+rX /app
 
 EXPOSE 8000
 
