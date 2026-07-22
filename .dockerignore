@@ -1,0 +1,9 @@
+downloads/
+.git/
+.gitignore
+README.md
+docker-compose.yml
+__pycache__/
+*.pyc
+.venv/
+.DS_Store

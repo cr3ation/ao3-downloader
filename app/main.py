@@ -1,0 +1,200 @@
+"""FastAPI application: routes, SSE stream, and lifecycle wiring."""
+import asyncio
+import json
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+
+from . import scraper
+from .ao3_client import AO3Client, AO3Error
+from .config import Settings
+from .downloader import METADATA_FILE, DownloadManager, load_metadata, remove_metadata_entry
+from .events import EventBus
+from .models import EnqueueRequest, SearchRequest, SearchResponse
+from .utils import safe_child
+
+APP_DIR = Path(__file__).parent
+SSE_KEEPALIVE_SECONDS = 15
+# Pseudo-category addressing files directly in the downloads root (flat mode).
+ROOT_CATEGORY = "_root"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = Settings.from_env()
+    bus = EventBus()
+    client = AO3Client(settings, bus)
+    manager = DownloadManager(client, settings, bus)
+    settings.downloads_dir.mkdir(parents=True, exist_ok=True)
+    manager.start()
+
+    app.state.settings = settings
+    app.state.bus = bus
+    app.state.client = client
+    app.state.manager = manager
+    yield
+    await manager.stop()
+    await client.close()
+
+
+app = FastAPI(title="AO3 Downloader", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
+
+
+@app.get("/")
+async def index() -> FileResponse:
+    return FileResponse(APP_DIR / "templates" / "index.html")
+
+
+@app.get("/healthz")
+async def healthz() -> dict:
+    return {"status": "ok"}
+
+
+@app.post("/api/search")
+async def api_search(req: SearchRequest, request: Request) -> SearchResponse:
+    settings: Settings = request.app.state.settings
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query must not be empty.")
+    req.query = query
+
+    max_results = max(1, min(req.max_results, settings.max_results_cap))
+    bus: EventBus = request.app.state.bus
+    bus.log("info", f"Searching {req.search_type} '{query}' (max {max_results} works)...")
+
+    try:
+        works, message, truncated = await scraper.search(
+            request.app.state.client, settings, bus, req, max_results
+        )
+    except AO3Error as exc:
+        bus.log("error", f"Search failed: {exc}")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    bus.log("info", f"Search finished: {len(works)} works for '{query}'.")
+    return SearchResponse(works=works, message=message, truncated=truncated)
+
+
+@app.post("/api/download")
+async def api_download(req: EnqueueRequest, request: Request) -> dict:
+    if not req.works:
+        raise HTTPException(status_code=400, detail="No works selected.")
+    if not req.category.strip():
+        raise HTTPException(status_code=400, detail="Category must not be empty.")
+
+    manager: DownloadManager = request.app.state.manager
+    job = manager.enqueue(req.works, req.format, req.category.strip())
+    return {"job_id": job.job_id, "queued": len(job.items)}
+
+
+@app.get("/api/jobs")
+async def api_jobs(request: Request) -> dict:
+    manager: DownloadManager = request.app.state.manager
+    return manager.snapshot()
+
+
+@app.get("/api/jobs/{job_id}")
+async def api_job_detail(job_id: str, request: Request) -> dict:
+    manager: DownloadManager = request.app.state.manager
+    job = manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found (jobs do not survive restarts).")
+    return job.detail()
+
+
+def _category_listing(folder: Path, name: str) -> dict:
+    meta = load_metadata(folder)
+    by_filename = {entry.get("filename"): (wid, entry) for wid, entry in meta.items()}
+    files = []
+    for f in sorted(folder.iterdir()):
+        if not f.is_file() or f.name == METADATA_FILE or f.name.endswith(".part") or f.name.startswith("."):
+            continue
+        work_id, entry = by_filename.get(f.name, (None, None))
+        files.append(
+            {
+                "filename": f.name,
+                "size": f.stat().st_size,
+                "work_id": work_id,
+                "entry": entry,
+            }
+        )
+    return {"name": name, "files": files, "metadata_entries": len(meta)}
+
+
+@app.get("/api/downloads")
+async def api_downloads(request: Request) -> dict:
+    settings: Settings = request.app.state.settings
+    categories = []
+    if settings.downloads_dir.exists():
+        # Flat-mode files live directly in the downloads root.
+        root = _category_listing(settings.downloads_dir, ROOT_CATEGORY)
+        if root["files"] or root["metadata_entries"]:
+            categories.append(root)
+        for folder in sorted(p for p in settings.downloads_dir.iterdir() if p.is_dir()):
+            categories.append(_category_listing(folder, folder.name))
+    return {"categories": categories}
+
+
+def _resolve_library_file(settings: Settings, category: str, filename: str) -> Path:
+    if filename == METADATA_FILE or filename.endswith(".part"):
+        raise HTTPException(status_code=400, detail="Invalid path.")
+    if category == ROOT_CATEGORY:
+        path = safe_child(settings.downloads_dir, filename)
+    else:
+        path = safe_child(settings.downloads_dir, category, filename)
+    if path is None:
+        raise HTTPException(status_code=400, detail="Invalid path.")
+    return path
+
+
+@app.get("/api/downloads/{category}/{filename}")
+async def api_download_file(category: str, filename: str, request: Request) -> FileResponse:
+    path = _resolve_library_file(request.app.state.settings, category, filename)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    return FileResponse(path, filename=path.name, media_type="application/octet-stream")
+
+
+@app.delete("/api/downloads/{category}/{filename}")
+async def api_delete_file(category: str, filename: str, request: Request) -> dict:
+    # async def with no await between metadata load and write: the read-modify-
+    # write cannot interleave with the download worker's on the event loop.
+    path = _resolve_library_file(request.app.state.settings, category, filename)
+    file_removed = path.is_file()
+    if file_removed:
+        path.unlink()
+    metadata_removed = remove_metadata_entry(path.parent, filename)
+    if not file_removed and not metadata_removed:
+        raise HTTPException(status_code=404, detail="File not found.")
+    bus: EventBus = request.app.state.bus
+    bus.log("info", f"Deleted {category}/{filename} (metadata entry removed: {metadata_removed}).")
+    return {"deleted": file_removed, "metadata_removed": metadata_removed, "filename": filename}
+
+
+@app.get("/api/events")
+async def api_events(request: Request) -> StreamingResponse:
+    bus: EventBus = request.app.state.bus
+    manager: DownloadManager = request.app.state.manager
+
+    async def stream():
+        q = bus.subscribe()
+        try:
+            snapshot = json.dumps(manager.snapshot(), ensure_ascii=False)
+            yield f"event: snapshot\ndata: {snapshot}\n\n"
+            while True:
+                try:
+                    frame = await asyncio.wait_for(q.get(), timeout=SSE_KEEPALIVE_SECONDS)
+                    yield frame
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            bus.unsubscribe(q)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

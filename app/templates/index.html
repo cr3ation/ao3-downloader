@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AO3 Downloader</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    details > summary { cursor: pointer; list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .chevron { transition: transform 0.15s; display: inline-block; }
+    details[open] > summary .chevron { transform: rotate(90deg); }
+  </style>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-200 antialiased">
+  <div id="connection-banner" class="hidden fixed top-0 inset-x-0 z-50 bg-amber-600 text-white text-center text-sm py-1.5">
+    Reconnecting to server...
+  </div>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <header class="flex items-baseline justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-white">AO3 Downloader</h1>
+        <p class="text-sm text-slate-400 mt-1">Search Archive of Our Own and download works as e-books.</p>
+      </div>
+      <span class="text-xs text-slate-500">Rate-limited &amp; polite by design</span>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="flex gap-1 border-b border-slate-800">
+      <button data-tab="search" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-500 text-white">Search</button>
+      <button data-tab="library" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Library</button>
+    </nav>
+
+    <!-- ============================== SEARCH TAB ============================== -->
+    <div id="tab-search" class="space-y-6">
+
+      <!-- Search card -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+        <form id="search-form" class="space-y-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input id="query" type="text" placeholder="Author username or tag (e.g. missyuki1990, Harry Potter)"
+                   class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                   autocomplete="off" required>
+            <div class="flex rounded-lg overflow-hidden border border-slate-700 shrink-0" role="radiogroup" aria-label="Search type">
+              <button type="button" data-type="author" class="type-btn px-4 py-2.5 text-sm bg-indigo-600 text-white">Author</button>
+              <button type="button" data-type="tag" class="type-btn px-4 py-2.5 text-sm bg-slate-800 text-slate-300">Tag / Fandom</button>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-end gap-4">
+            <label class="text-sm">
+              <span class="block text-slate-400 mb-1">Format</span>
+              <select id="format" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="epub" selected>EPUB</option>
+                <option value="pdf">PDF</option>
+                <option value="mobi">MOBI</option>
+                <option value="html">HTML</option>
+                <option value="azw3">AZW3</option>
+              </select>
+            </label>
+            <label class="text-sm">
+              <span class="block text-slate-400 mb-1">Sort by</span>
+              <select id="sort-by" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="revised_at" selected>Date updated</option>
+                <option value="kudos_count">Kudos</option>
+                <option value="hits">Hits</option>
+                <option value="bookmarks_count">Bookmarks</option>
+                <option value="word_count">Word count</option>
+              </select>
+            </label>
+            <label class="text-sm">
+              <span class="block text-slate-400 mb-1">Max results</span>
+              <input id="max-results" type="number" min="1" max="500" value="100"
+                     class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </label>
+            <button id="search-btn" type="submit"
+                    class="ml-auto bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg px-6 py-2.5 flex items-center gap-2">
+              <svg id="search-spinner" class="hidden animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              <span id="search-btn-label">Search</span>
+            </button>
+          </div>
+
+          <!-- Filters -->
+          <details id="filters-panel" class="border border-slate-800 rounded-lg px-4 py-3">
+            <summary class="text-sm text-slate-300 select-none">
+              <span class="chevron mr-1 text-slate-500">&#9656;</span>Filters
+              <span id="filters-active" class="hidden ml-2 text-xs bg-indigo-900/60 text-indigo-300 rounded px-1.5 py-0.5">active</span>
+            </summary>
+            <div class="mt-3 flex flex-wrap items-end gap-4">
+              <label class="flex items-center gap-2 text-sm text-slate-300 pb-2">
+                <input id="filter-complete" type="checkbox" class="rounded accent-indigo-500">
+                Complete works only
+              </label>
+              <label class="text-sm">
+                <span class="block text-slate-400 mb-1">Words min</span>
+                <input id="filter-words-min" type="number" min="0" placeholder="e.g. 1000"
+                       class="w-28 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+              <label class="text-sm">
+                <span class="block text-slate-400 mb-1">Words max</span>
+                <input id="filter-words-max" type="number" min="0" placeholder="e.g. 50000"
+                       class="w-28 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+              <label class="text-sm flex-1 min-w-[220px]">
+                <span class="block text-slate-400 mb-1">Exclude tags (comma-separated)</span>
+                <input id="filter-exclude" type="text" placeholder="e.g. Angst, Major Character Death"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+            </div>
+          </details>
+
+          <!-- Search guide -->
+          <details id="search-guide" class="border border-slate-800 rounded-lg px-4 py-3">
+            <summary class="text-sm text-slate-300 select-none">
+              <span class="chevron mr-1 text-slate-500">&#9656;</span>Search guide
+            </summary>
+            <div class="mt-3 space-y-3 text-sm text-slate-400">
+              <div>
+                <h3 class="text-slate-200 font-medium">Author</h3>
+                <p>Searches a user's works page. Use the exact AO3 username, e.g. <code class="text-indigo-300">missyuki1990</code>. You can find it in any work URL: archiveofourown.org/users/<b>username</b>.</p>
+              </div>
+              <div>
+                <h3 class="text-slate-200 font-medium">Tag / Fandom</h3>
+                <p>Searches an AO3 tag page. Tags cover fandoms, relationships, characters and freeform tags — for example:</p>
+                <ul class="list-disc ml-5 mt-1 space-y-0.5">
+                  <li>Fandom: <code class="text-indigo-300">Harry Potter - J. K. Rowling</code> (often just <code class="text-indigo-300">Harry Potter</code> works too)</li>
+                  <li>Relationship: <code class="text-indigo-300">Draco Malfoy/Harry Potter</code></li>
+                  <li>Freeform: <code class="text-indigo-300">Enemies to Lovers</code>, <code class="text-indigo-300">Fluff</code></li>
+                </ul>
+                <p class="mt-1">If the exact tag doesn't exist, the app automatically falls back to AO3's general work search.</p>
+              </div>
+              <div>
+                <h3 class="text-slate-200 font-medium">Advanced queries</h3>
+                <p>In the general search (used as tag fallback) AO3 supports operators:</p>
+                <ul class="list-disc ml-5 mt-1 space-y-0.5">
+                  <li><code class="text-indigo-300">"exact phrase"</code> — match the exact words</li>
+                  <li><code class="text-indigo-300">Harry AND Draco</code>, <code class="text-indigo-300">Sith OR Jedi</code> — boolean logic</li>
+                  <li><code class="text-indigo-300">-wordToExclude</code> — exclude a term</li>
+                  <li><code class="text-indigo-300">wolf*</code> — wildcard</li>
+                </ul>
+              </div>
+              <p class="text-slate-500">The Filters above (complete only, word count, excluded tags) apply to both Author and Tag searches.</p>
+            </div>
+          </details>
+
+          <p class="text-xs text-slate-500">Searches are rate-limited to be polite to AO3 — multi-page searches can take a while.</p>
+        </form>
+      </section>
+
+      <!-- Results card -->
+      <section id="results-card" class="hidden bg-slate-900 border border-slate-800 rounded-xl">
+        <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-800">
+          <label class="flex items-center gap-2 text-sm text-slate-300">
+            <input id="select-all" type="checkbox" checked class="rounded accent-indigo-500">
+            Select all
+          </label>
+          <span id="results-count" class="text-sm text-slate-400"></span>
+          <span id="results-message" class="text-sm text-amber-400"></span>
+          <button id="download-btn"
+                  class="ml-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg px-5 py-2">
+            Download selected (<span id="selected-count">0</span>)
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
+                <th class="px-5 py-3 w-8"></th>
+                <th class="px-2 py-3">Work</th>
+                <th class="px-2 py-3 whitespace-nowrap sortable cursor-pointer hover:text-slate-300" data-sort-key="word_count">Words <span class="sort-arrow"></span></th>
+                <th class="px-2 py-3 whitespace-nowrap sortable cursor-pointer hover:text-slate-300" data-sort-key="kudos">Kudos <span class="sort-arrow"></span></th>
+                <th class="px-2 py-3 whitespace-nowrap sortable cursor-pointer hover:text-slate-300" data-sort-key="hits">Hits <span class="sort-arrow"></span></th>
+                <th class="px-5 py-3 w-28">Status</th>
+              </tr>
+            </thead>
+            <tbody id="results-body" class="divide-y divide-slate-800/60"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Progress card -->
+      <section id="progress-card" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+        <div class="flex items-center justify-between text-sm">
+          <span id="progress-text" class="text-slate-200 font-medium truncate pr-4">Waiting...</span>
+          <span id="progress-fraction" class="text-slate-400 shrink-0"></span>
+        </div>
+        <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+          <div id="progress-bar" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="progress-summary" class="hidden text-sm text-slate-300"></p>
+      </section>
+    </div>
+
+    <!-- ============================== LIBRARY TAB ============================== -->
+    <div id="tab-library" class="hidden space-y-6">
+      <section class="bg-slate-900 border border-slate-800 rounded-xl">
+        <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-800">
+          <input id="lib-filter" type="text" placeholder="Filter by title, author, tag or filename..."
+                 class="flex-1 min-w-[200px] bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <label class="text-sm text-slate-400 flex items-center gap-2">
+            Sort
+            <select id="lib-sort" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="title" selected>Title A–Z</option>
+              <option value="author">Author A–Z</option>
+              <option value="words">Word count</option>
+              <option value="downloaded">Downloaded date</option>
+              <option value="size">File size</option>
+            </select>
+          </label>
+          <button id="lib-refresh" class="text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg px-4 py-2">Refresh</button>
+        </div>
+        <p id="lib-empty" class="hidden px-5 py-8 text-sm text-slate-500 text-center">No downloads yet. Search for works and download them — they'll show up here.</p>
+        <div id="lib-categories" class="divide-y divide-slate-800"></div>
+      </section>
+    </div>
+
+    <!-- Activity log -->
+    <section class="bg-slate-900 border border-slate-800 rounded-xl">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-slate-800">
+        <h2 class="text-sm font-medium text-slate-300">Activity log</h2>
+        <button id="clear-log" class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+      </div>
+      <div id="log" class="h-64 overflow-y-auto px-5 py-3 font-mono text-xs space-y-0.5"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

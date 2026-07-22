@@ -1,0 +1,34 @@
+services:
+  ao3-downloader:
+    build: .
+    container_name: ao3-downloader
+    ports:
+      - "8067:8000"
+    volumes:
+      # Set the host path (left side) to the SAME folder Calibre watches for
+      # automatic adding (calibre > Preferences > Adding books > Automatic adding),
+      # e.g.:  - /Users/you/CalibreAutoAdd:/app/downloads
+      - ./downloads:/app/downloads
+    environment:
+      AO3_MIN_DELAY: "3"
+      AO3_MAX_DELAY: "6"
+      MAX_RETRIES: "5"
+      RETRY_BACKOFF_BASE: "30"
+      RETRY_BACKOFF_CAP: "600"
+      # Embedded as a subject inside every downloaded EPUB's metadata, which
+      # Calibre imports as a tag ("read metadata from file contents", its
+      # default). Set to "" to disable.
+      EPUB_TAG: "Fanfiction"
+      # Save all files directly in the downloads root instead of per-category
+      # subfolders. Required for Calibre's automatic adding, which does NOT
+      # scan subfolders.
+      FLAT_DOWNLOADS: "true"
+      # MAX_RESULTS_CAP: "500"
+      # USER_AGENT: "..."
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
