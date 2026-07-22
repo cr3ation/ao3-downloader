@@ -32,6 +32,25 @@ def load_metadata(folder: Path) -> dict:
         return {}
 
 
+def downloaded_formats(settings: Settings) -> dict[str, list[str]]:
+    """Map work_id -> formats already downloaded, across every category.
+
+    Deliberately global: the question the search results answer is "do I
+    already have this?", regardless of which category it was filed under.
+    """
+    folders = [settings.config_dir]
+    if settings.config_dir.exists():
+        folders.extend(p for p in settings.config_dir.iterdir() if p.is_dir())
+
+    result: dict[str, list[str]] = {}
+    for folder in folders:
+        for work_id, entry in load_metadata(folder).items():
+            fmt = entry.get("format")
+            if fmt and fmt not in result.setdefault(work_id, []):
+                result[work_id].append(fmt)
+    return result
+
+
 def remove_metadata_entry(folder: Path, filename: str) -> bool:
     """Remove the entry claiming `filename`. Load-modify-write with no await in
     between, so it is atomic on the event loop against the worker's writes."""

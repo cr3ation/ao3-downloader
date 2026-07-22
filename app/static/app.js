@@ -5,6 +5,7 @@ const state = {
   order: [], // work_ids in server-returned order
   selected: new Set(), // checked work_ids
   statuses: new Map(), // work_id -> {status, message} (survives re-sorts)
+  downloaded: new Map(), // work_id -> formats already in the library
   sort: { key: null, dir: "desc" }, // local results sort
   searchType: "author",
   lastQuery: "",
@@ -227,7 +228,8 @@ function setSearching(on) {
 
 // ---------------------------------------------------------------- Results table
 
-function renderResults({ works, message, truncated }) {
+function renderResults({ works, message, truncated, downloaded }) {
+  state.downloaded = new Map(Object.entries(downloaded || {}));
   // A pasted link would make a useless folder name — file it under the author.
   state.category = isWorkLink(state.lastQuery) && works.length ? works[0].authors[0] : state.lastQuery;
 
@@ -345,8 +347,19 @@ function renderResultRows() {
     tr.append(tdCheck, tdWork, tdWords, tdKudos, tdHits, tdStatus);
     body.appendChild(tr);
 
+    // Job status wins; otherwise fall back to what the library already holds.
     const st = state.statuses.get(w.work_id);
-    if (st) applyStatusBadge(tr, st.status, st.message);
+    if (st) {
+      applyStatusBadge(tr, st.status, st.message);
+    } else if (state.downloaded.has(w.work_id)) {
+      const formats = state.downloaded.get(w.work_id);
+      applyBadge(
+        tr,
+        "In library",
+        "bg-slate-800 text-slate-400 border border-slate-700",
+        `Already downloaded as ${formats.join(", ").toUpperCase()} — it will be skipped if selected.`
+      );
+    }
   }
   updateSelectedCount();
 }
@@ -420,13 +433,17 @@ function markRow(workId, status, message) {
 }
 
 function applyStatusBadge(tr, status, message) {
-  const cell = tr.querySelector(".status-cell");
   const [label, classes] = STATUS_BADGES[status] || [status, "bg-slate-800 text-slate-400"];
+  applyBadge(tr, label, classes, message);
+}
+
+function applyBadge(tr, label, classes, title) {
+  const cell = tr.querySelector(".status-cell");
   cell.innerHTML = "";
   const badge = document.createElement("span");
   badge.className = `inline-block text-[11px] rounded px-2 py-0.5 ${classes}`;
   badge.textContent = label;
-  if (message) badge.title = message;
+  if (title) badge.title = title;
   cell.appendChild(badge);
 }
 

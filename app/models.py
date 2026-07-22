@@ -44,6 +44,8 @@ class SearchResponse(BaseModel):
     works: list[Work]
     message: str | None = None
     truncated: bool = False
+    # work_id -> formats already in the library, for the results table.
+    downloaded: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class EnqueueRequest(BaseModel):

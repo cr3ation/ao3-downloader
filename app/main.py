@@ -12,7 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from . import scraper
 from .ao3_client import AO3Client, AO3Error
 from .config import Settings
-from .downloader import METADATA_FILE, DownloadManager, load_metadata, remove_metadata_entry
+from .downloader import (
+    METADATA_FILE,
+    DownloadManager,
+    downloaded_formats,
+    load_metadata,
+    remove_metadata_entry,
+)
 from .events import EventBus
 from .models import EnqueueRequest, SearchRequest, SearchResponse
 from .utils import safe_child
@@ -111,8 +117,15 @@ async def api_search(req: SearchRequest, request: Request) -> SearchResponse:
         bus.log("error", f"Search failed: {exc}")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    bus.log("info", f"Search finished: {len(works)} works for '{query}'.")
-    return SearchResponse(works=works, message=message, truncated=truncated)
+    known = downloaded_formats(settings)
+    downloaded = {w.work_id: known[w.work_id] for w in works if w.work_id in known}
+
+    bus.log(
+        "info",
+        f"Search finished: {len(works)} works for '{query}'"
+        + (f" ({len(downloaded)} already in your library)." if downloaded else "."),
+    )
+    return SearchResponse(works=works, message=message, truncated=truncated, downloaded=downloaded)
 
 
 @app.post("/api/download")
