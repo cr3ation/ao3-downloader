@@ -112,3 +112,13 @@ Note: setting tags from the *filename* is not possible in Calibre — its filena
 ## Respect creators
 
 This tool is intended for **personal archiving** of works you have access to. Please respect [AO3's Terms of Service](https://archiveofourown.org/tos) and the wishes of the creators whose works you download. Keep the rate limits generous — AO3 is a donation-funded nonprofit.
+
+## License
+
+Copyright (C) 2026 Henrik Engström
+
+This program is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License version 3** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [GNU General Public License](LICENSE) for more details.
+
+The full license text is in [LICENSE](LICENSE), or at <https://www.gnu.org/licenses/gpl-3.0.txt>.
