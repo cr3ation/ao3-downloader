@@ -233,7 +233,7 @@ function renderResults({ works, message, truncated }) {
 
   state.results = new Map(works.map((w) => [w.work_id, w]));
   state.order = works.map((w) => w.work_id);
-  state.selected = new Set(state.order);
+  state.selected = new Set(); // nothing pre-selected — downloading is opt-in
   state.statuses = new Map();
   state.sort = { key: null, dir: "desc" };
 
@@ -241,7 +241,7 @@ function renderResults({ works, message, truncated }) {
     works.length === 0 ? "No works found." : `${works.length} works found${truncated ? " (limit reached)" : ""}`;
   $("results-message").textContent = message || "";
   $("results-card").classList.remove("hidden");
-  $("select-all").checked = true;
+  $("select-all").checked = false;
 
   renderResultRows();
 }

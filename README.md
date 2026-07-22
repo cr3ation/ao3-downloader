@@ -23,7 +23,7 @@ Downloaded files appear on the host in the `./downloads/` bind mount, named `Tit
 2. Choose a format (EPUB is default), a **Sort by** order (date updated, kudos, hits, bookmarks or word count — applied server-side by AO3) and a max result count (default 100, server cap 500).
 3. Optionally open **Filters**: complete works only, word count min/max, and comma-separated tags to exclude. Filters work for both author and tag searches (and survive the tag-search fallback, with slight approximations noted in the UI code).
 4. Click **Search** — results stream in page by page (narrated in the activity log). Result rows show word count, kudos, hits, a rating badge and a Complete/WIP badge; click the **Words / Kudos / Hits** column headers to re-sort locally without touching AO3.
-5. Untick anything you don't want, then click **Download selected**.
+5. Tick the works you want — nothing is selected by default; use the header checkbox to select all — then click **Download selected**.
 6. Watch the progress bar and the activity log. Each row gets a ✓ Done / Skipped / Error badge.
 
 Already-downloaded files are **skipped automatically** (dedup checks the file on disk), so re-running a search + download is cheap and safe.
