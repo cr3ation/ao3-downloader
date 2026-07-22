@@ -29,6 +29,24 @@ def sanitize_filename(name: str, fallback: str = "untitled", max_length: int = 1
     return name or fallback
 
 
+_WORK_REF = re.compile(r"(?:archiveofourown\.org|ao3\.org)?/?works/(\d+)", re.IGNORECASE)
+
+
+def parse_work_ref(query: str) -> str | None:
+    """Extract an AO3 work ID from a pasted work/chapter URL, or a bare ID.
+
+    Accepts anything containing `/works/<id>` — including chapter URLs like
+    /works/123/chapters/456 — plus a bare numeric ID.
+    """
+    q = query.strip()
+    match = _WORK_REF.search(q)
+    if match:
+        return match.group(1)
+    if q.isdigit() and len(q) >= 5:
+        return q
+    return None
+
+
 def encode_tag(tag: str) -> str:
     for char, replacement in _TAG_SUBSTITUTIONS:
         tag = tag.replace(char, replacement)

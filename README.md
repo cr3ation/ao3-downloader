@@ -5,10 +5,13 @@ A self-hosted web app that searches [Archive of Our Own](https://archiveofourown
 ## Quick start
 
 ```bash
+cp .env.example .env      # optional — edit paths, port, PUID/PGID, timezone
 docker compose up -d --build
 ```
 
 Then open **http://localhost:8067**.
+
+Every setting has a default, so `docker compose up -d --build` works straight after a clone even without a `.env` file. `.env` is git-ignored, which means **`git pull` never overwrites your local paths** — handy when the same repo runs on both a laptop and a NAS. See [`.env.example`](.env.example) for every option.
 
 Downloaded files appear on the host in the `./downloads/` bind mount, named `Title - Author.ext`. With the default `docker-compose.yml` (Calibre mode, see below) all files land directly in the downloads root; set `FLAT_DOWNLOADS: "false"` to instead get per-search subfolders (`./downloads/<search query>/...`).
 
@@ -16,7 +19,7 @@ Downloaded files appear on the host in the `./downloads/` bind mount, named `Tit
 
 ## Using the app
 
-1. Enter an author username (e.g. `missyuki1990`) or a tag/fandom (e.g. `Harry Potter`), pick **Author** or **Tag / Fandom**. The built-in **Search guide** panel explains the difference and AO3's advanced query operators (`"exact phrase"`, `AND`/`OR`, `-exclude`, `*` wildcard).
+1. Enter an author username (e.g. `missyuki1990`), a tag/fandom (e.g. `Harry Potter`), **or paste an AO3 work link** — any work or chapter URL such as `https://archiveofourown.org/works/2755349/chapters/6177083` fetches exactly that story and ignores the Author/Tag toggle. The built-in **Search guide** panel explains each mode and AO3's advanced query operators (`"exact phrase"`, `AND`/`OR`, `-exclude`, `*` wildcard).
 2. Choose a format (EPUB is default), a **Sort by** order (date updated, kudos, hits, bookmarks or word count — applied server-side by AO3) and a max result count (default 100, server cap 500).
 3. Optionally open **Filters**: complete works only, word count min/max, and comma-separated tags to exclude. Filters work for both author and tag searches (and survive the tag-search fallback, with slight approximations noted in the UI code).
 4. Click **Search** — results stream in page by page (narrated in the activity log). Result rows show word count, kudos, hits, a rating badge and a Complete/WIP badge; click the **Words / Kudos / Hits** column headers to re-sort locally without touching AO3.
@@ -56,8 +59,13 @@ Set in `docker-compose.yml` (defaults shown):
 | `EPUB_TAG` | `Fanfiction` | Tag embedded in every downloaded EPUB's metadata (imported by Calibre); `""` disables |
 | `FLAT_DOWNLOADS` | `false` (set `true` in compose) | Save files in the downloads root instead of per-search subfolders |
 | `USER_AGENT` | Chrome UA | Outgoing User-Agent header |
-| `DOWNLOADS_DIR` | `/app/downloads` | Download target inside the container (e-books only) |
-| `CONFIG_DIR` | `/app/config` | Where `metadata.json` is kept, outside the Calibre watch folder |
+| `DOWNLOADS_PATH` | `./downloads` | **Host** folder for e-books — point at Calibre's watch folder |
+| `CONFIG_PATH` | `./config` | **Host** folder for `metadata.json`; keep outside the watch folder |
+| `PORT` | `8067` | Host port for the web UI |
+| `PUID` / `PGID` | `1000` / `1000` | User/group the app runs as — match `id -u` / `id -g` so files are owned by you |
+| `TZ` | `Europe/Stockholm` | Container timezone |
+| `DOWNLOADS_DIR` | `/app/downloads` | Download target *inside* the container (rarely changed) |
+| `CONFIG_DIR` | `/app/config` | State location *inside* the container (rarely changed) |
 
 ## Calibre integration
 
@@ -65,12 +73,11 @@ The app is designed to feed [Calibre](https://calibre-ebook.com/)'s **automatic 
 
 ### 1. Point both apps at the same folder
 
-In `docker-compose.yml`, set the host side of the volume to the folder Calibre watches:
+In `.env`, point `DOWNLOADS_PATH` at the folder Calibre watches (do **not** edit `docker-compose.yml` — that would be overwritten by the next `git pull`):
 
-```yaml
-volumes:
-  - /Users/you/CalibreAutoAdd:/app/downloads
-  - ./config:/app/config          # app state — keep OUT of the watched folder
+```bash
+DOWNLOADS_PATH=/Users/you/CalibreAutoAdd
+CONFIG_PATH=./config          # app state — keep OUT of the watched folder
 ```
 
 In Calibre: **Preferences → Import/export → Adding books → Automatic adding tab** → set "Specify a folder..." to that same folder.
@@ -110,7 +117,7 @@ Note: setting tags from the *filename* is not possible in Calibre — its filena
 - **Public works only.** Restricted works (login required) are skipped with a clear log message.
 - **The job queue is in-memory.** If the container restarts mid-job, the queue is lost — but downloaded files persist, and dedup makes re-enqueueing the same selection cheap.
 - **Single process by design.** The rate limiter and job state live in one process; never run uvicorn with `--workers N`.
-- **Linux hosts:** the `./downloads` bind mount must be writable by uid 1000 (`chown -R 1000 downloads` if needed). Docker Desktop on macOS/Windows handles this automatically.
+- **File ownership:** set `PUID`/`PGID` in `.env` to your own `id -u`/`id -g` so downloaded files belong to you. The container starts as root only to apply them, then drops to an unprivileged user via `gosu` — uvicorn never runs as root. To skip that entirely, add `user: "1000:1000"` to the compose service; the entrypoint detects it and steps aside.
 - **Tailwind via CDN:** the UI loads Tailwind from `cdn.tailwindcss.com`, so the browser needs internet access at page load. Vendor a built CSS file into `app/static/` if you need fully offline operation.
 - Filename collisions (same title + author, different work) are disambiguated with a ` [work_id]` suffix.
 

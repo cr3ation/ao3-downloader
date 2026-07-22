@@ -12,10 +12,7 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    details > summary { cursor: pointer; list-style: none; }
-    details > summary::-webkit-details-marker { display: none; }
-    details > summary .chevron { transition: transform 0.15s; display: inline-block; }
-    details[open] > summary .chevron { transform: rotate(90deg); }
+    code { font-size: 0.8em; }
   </style>
 </head>
 <body class="min-h-full bg-slate-950 text-slate-200 antialiased">
@@ -45,7 +42,7 @@
       <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
         <form id="search-form" class="space-y-4">
           <div class="flex flex-col sm:flex-row gap-3">
-            <input id="query" type="text" placeholder="Author username or tag (e.g. missyuki1990, Harry Potter)"
+            <input id="query" type="text" placeholder="Author, tag, or paste an AO3 work link"
                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                    autocomplete="off" required>
             <div class="flex rounded-lg overflow-hidden border border-slate-700 shrink-0" role="radiogroup" aria-label="Search type">
@@ -89,13 +86,32 @@
             </button>
           </div>
 
+          <!-- Compact toggle row -->
+          <div class="flex items-center gap-3">
+            <button type="button" id="toggle-filters" aria-expanded="false"
+                    class="flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 border bg-slate-800/60 border-slate-700/50 text-slate-300 hover:bg-slate-800 hover:text-slate-100">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M4 6h16M7 12h10M10 18h4"/>
+              </svg>
+              Filters
+              <span id="filters-count" class="hidden bg-indigo-500/30 text-indigo-200 rounded px-1.5 text-[11px] leading-4"></span>
+            </button>
+            <button type="button" id="toggle-guide" aria-expanded="false"
+                    class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 py-1.5">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 113.5 2.3c-.6.3-1 .9-1 1.6v.3" stroke-linecap="round"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>
+              </svg>
+              Search guide
+            </button>
+          </div>
+
           <!-- Filters -->
-          <details id="filters-panel" class="border border-slate-800 rounded-lg px-4 py-3">
-            <summary class="text-sm text-slate-300 select-none">
-              <span class="chevron mr-1 text-slate-500">&#9656;</span>Filters
-              <span id="filters-active" class="hidden ml-2 text-xs bg-indigo-900/60 text-indigo-300 rounded px-1.5 py-0.5">active</span>
-            </summary>
-            <div class="mt-3 flex flex-wrap items-end gap-4">
+          <div id="filters-panel" class="hidden rounded-lg bg-slate-950/60 border border-slate-800/60 p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs uppercase tracking-wide text-slate-500">Filters</h3>
+              <button type="button" id="clear-filters" class="text-xs text-slate-500 hover:text-slate-300">Clear filters</button>
+            </div>
+            <div class="flex flex-wrap items-end gap-4">
               <label class="flex items-center gap-2 text-sm text-slate-300 pb-2">
                 <input id="filter-complete" type="checkbox" class="rounded accent-indigo-500">
                 Complete works only
@@ -116,41 +132,49 @@
                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
               </label>
             </div>
-          </details>
+          </div>
 
           <!-- Search guide -->
-          <details id="search-guide" class="border border-slate-800 rounded-lg px-4 py-3">
-            <summary class="text-sm text-slate-300 select-none">
-              <span class="chevron mr-1 text-slate-500">&#9656;</span>Search guide
-            </summary>
-            <div class="mt-3 space-y-3 text-sm text-slate-400">
+          <div id="guide-panel" class="hidden rounded-lg bg-slate-950/60 border border-slate-800/60 p-4 space-y-4">
+            <div class="grid gap-4 md:grid-cols-3">
               <div>
-                <h3 class="text-slate-200 font-medium">Author</h3>
-                <p>Searches a user's works page. Use the exact AO3 username, e.g. <code class="text-indigo-300">missyuki1990</code>. You can find it in any work URL: archiveofourown.org/users/<b>username</b>.</p>
+                <h3 class="text-slate-200 text-sm font-medium mb-1">Paste a link</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  Paste any AO3 work or chapter URL to fetch exactly that story — the Author/Tag toggle is ignored.
+                </p>
+                <p class="mt-1.5"><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">archiveofourown.org/works/2755349</code></p>
               </div>
               <div>
-                <h3 class="text-slate-200 font-medium">Tag / Fandom</h3>
-                <p>Searches an AO3 tag page. Tags cover fandoms, relationships, characters and freeform tags — for example:</p>
-                <ul class="list-disc ml-5 mt-1 space-y-0.5">
-                  <li>Fandom: <code class="text-indigo-300">Harry Potter - J. K. Rowling</code> (often just <code class="text-indigo-300">Harry Potter</code> works too)</li>
-                  <li>Relationship: <code class="text-indigo-300">Draco Malfoy/Harry Potter</code></li>
-                  <li>Freeform: <code class="text-indigo-300">Enemies to Lovers</code>, <code class="text-indigo-300">Fluff</code></li>
-                </ul>
-                <p class="mt-1">If the exact tag doesn't exist, the app automatically falls back to AO3's general work search.</p>
+                <h3 class="text-slate-200 text-sm font-medium mb-1">Author</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  The exact AO3 username, as it appears in <span class="text-slate-500">archiveofourown.org/users/<b class="text-slate-300">name</b></span>.
+                </p>
+                <p class="mt-1.5"><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">missyuki1990</code></p>
               </div>
               <div>
-                <h3 class="text-slate-200 font-medium">Advanced queries</h3>
-                <p>In the general search (used as tag fallback) AO3 supports operators:</p>
-                <ul class="list-disc ml-5 mt-1 space-y-0.5">
-                  <li><code class="text-indigo-300">"exact phrase"</code> — match the exact words</li>
-                  <li><code class="text-indigo-300">Harry AND Draco</code>, <code class="text-indigo-300">Sith OR Jedi</code> — boolean logic</li>
-                  <li><code class="text-indigo-300">-wordToExclude</code> — exclude a term</li>
-                  <li><code class="text-indigo-300">wolf*</code> — wildcard</li>
-                </ul>
+                <h3 class="text-slate-200 text-sm font-medium mb-1">Tag / Fandom</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                  Canonical AO3 tags — fandoms, relationships or freeform tags. Unknown tags fall back to AO3's general search.
+                </p>
+                <p class="mt-1.5 flex flex-wrap gap-1">
+                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Harry Potter - J. K. Rowling</code>
+                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Draco Malfoy/Harry Potter</code>
+                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Enemies to Lovers</code>
+                </p>
               </div>
-              <p class="text-slate-500">The Filters above (complete only, word count, excluded tags) apply to both Author and Tag searches.</p>
             </div>
-          </details>
+            <div class="border-t border-slate-800/60 pt-3">
+              <h3 class="text-slate-200 text-sm font-medium mb-1.5">Advanced queries</h3>
+              <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-400">
+                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">"exact phrase"</code> exact words</span>
+                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Harry AND Draco</code> both</span>
+                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Sith OR Jedi</code> either</span>
+                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">-angst</code> exclude</span>
+                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">wolf*</code> wildcard</span>
+              </div>
+              <p class="mt-2 text-xs text-slate-500">Filters apply to both Author and Tag searches. Operators work in the general search used as tag fallback.</p>
+            </div>
+          </div>
 
           <p class="text-xs text-slate-500">Searches are rate-limited to be polite to AO3 — multi-page searches can take a while.</p>
         </form>

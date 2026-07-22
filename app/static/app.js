@@ -8,6 +8,8 @@ const state = {
   sort: { key: null, dir: "desc" }, // local results sort
   searchType: "author",
   lastQuery: "",
+  category: "", // download folder name; differs from lastQuery for pasted links
+  openPanel: null, // "filters" | "guide" | null
   library: { categories: [], loaded: false },
   activeTab: "search",
 };
@@ -108,6 +110,31 @@ document.querySelectorAll(".type-btn").forEach((btn) => {
   });
 });
 
+// ---------------------------------------------------------------- Filters & guide panels
+
+const WORK_LINK = /(?:archiveofourown\.org|ao3\.org)?\/?works\/(\d+)/i;
+
+function isWorkLink(query) {
+  const q = query.trim();
+  return WORK_LINK.test(q) || (/^\d+$/.test(q) && q.length >= 5);
+}
+
+function togglePanel(name) {
+  state.openPanel = state.openPanel === name ? null : name;
+  for (const [panel, btn] of [
+    ["filters", "toggle-filters"],
+    ["guide", "toggle-guide"],
+  ]) {
+    const open = state.openPanel === panel;
+    $(panel === "filters" ? "filters-panel" : "guide-panel").classList.toggle("hidden", !open);
+    $(btn).setAttribute("aria-expanded", String(open));
+  }
+  paintFilterChip();
+}
+
+$("toggle-filters").addEventListener("click", () => togglePanel("filters"));
+$("toggle-guide").addEventListener("click", () => togglePanel("guide"));
+
 function readFilters() {
   const wordsMin = parseInt($("filter-words-min").value, 10);
   const wordsMax = parseInt($("filter-words-max").value, 10);
@@ -115,17 +142,49 @@ function readFilters() {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-  const filters = {
+  return {
     complete_only: $("filter-complete").checked,
     words_from: Number.isFinite(wordsMin) ? wordsMin : null,
     words_to: Number.isFinite(wordsMax) ? wordsMax : null,
     exclude_tags: excludeTags,
   };
-  const active =
-    filters.complete_only || filters.words_from !== null || filters.words_to !== null || excludeTags.length > 0;
-  $("filters-active").classList.toggle("hidden", !active);
-  return filters;
 }
+
+function activeFilterCount() {
+  const f = readFilters();
+  return (
+    (f.complete_only ? 1 : 0) +
+    (f.words_from !== null ? 1 : 0) +
+    (f.words_to !== null ? 1 : 0) +
+    (f.exclude_tags.length ? 1 : 0)
+  );
+}
+
+const CHIP_IDLE = ["bg-slate-800/60", "border-slate-700/50", "text-slate-300"];
+const CHIP_ACTIVE = ["bg-indigo-600/20", "border-indigo-500/40", "text-indigo-300"];
+
+function paintFilterChip() {
+  const count = activeFilterCount();
+  const chip = $("toggle-filters");
+  chip.classList.remove(...CHIP_IDLE, ...CHIP_ACTIVE);
+  chip.classList.add(...(count ? CHIP_ACTIVE : CHIP_IDLE));
+  const badge = $("filters-count");
+  badge.textContent = count;
+  badge.classList.toggle("hidden", count === 0);
+}
+
+["filter-complete", "filter-words-min", "filter-words-max", "filter-exclude"].forEach((id) => {
+  $(id).addEventListener("input", paintFilterChip);
+  $(id).addEventListener("change", paintFilterChip);
+});
+
+$("clear-filters").addEventListener("click", () => {
+  $("filter-complete").checked = false;
+  $("filter-words-min").value = "";
+  $("filter-words-max").value = "";
+  $("filter-exclude").value = "";
+  paintFilterChip();
+});
 
 $("search-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -169,6 +228,9 @@ function setSearching(on) {
 // ---------------------------------------------------------------- Results table
 
 function renderResults({ works, message, truncated }) {
+  // A pasted link would make a useless folder name — file it under the author.
+  state.category = isWorkLink(state.lastQuery) && works.length ? works[0].authors[0] : state.lastQuery;
+
   state.results = new Map(works.map((w) => [w.work_id, w]));
   state.order = works.map((w) => w.work_id);
   state.selected = new Set(state.order);
@@ -382,7 +444,7 @@ $("download-btn").addEventListener("click", async () => {
       body: JSON.stringify({
         works: selected,
         format: $("format").value,
-        category: state.lastQuery,
+        category: state.category || state.lastQuery,
       }),
     });
     if (!resp.ok) {

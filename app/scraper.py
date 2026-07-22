@@ -9,18 +9,24 @@ from .ao3_client import AO3Client, AO3Error, RestrictedWorkError
 from .config import Settings
 from .events import EventBus
 from .models import SearchRequest, Work
-from .utils import encode_tag
+from .utils import encode_tag, parse_work_ref
 
 WORKS_PER_PAGE = 20
 
 
-def _parse_count(li, selector: str) -> int | None:
+def _parse_count(scope, selector: str) -> int | None:
+    """Read a numeric stat. `scope` is a blurb <li> or a whole work-page soup."""
     # AO3 omits the whole dd element at zero (kudos/bookmarks), hence None, not 0.
-    el = li.select_one(selector)
+    el = scope.select_one(selector)
     if not el:
         return None
     digits = re.sub(r"[^\d]", "", el.get_text())
     return int(digits) if digits else None
+
+
+def _text_or_none(scope, selector: str) -> str | None:
+    el = scope.select_one(selector)
+    return el.get_text(strip=True) if el else None
 
 
 def _derive_complete(chapters: str | None) -> bool | None:
@@ -99,6 +105,54 @@ def parse_blurbs(html: str) -> list[Work]:
     return works
 
 
+def parse_work_page(html: str, work_id: str) -> Work:
+    """Build a Work from a single work's page (selectors verified against AO3)."""
+    soup = BeautifulSoup(html, "lxml")
+
+    title = _text_or_none(soup, "h2.title.heading") or f"Work {work_id}"
+    authors = [a.get_text(strip=True) for a in soup.select("a[rel='author']")] or ["Anonymous"]
+    chapters = _text_or_none(soup, "dd.chapters")
+
+    # Mirror the tag set parse_blurbs collects, in AO3's own display order.
+    tag_selectors = "dd.warning.tags a.tag, dd.relationship.tags a.tag, dd.character.tags a.tag, dd.freeform.tags a.tag"
+    tags = [t.get_text(strip=True) for t in soup.select(tag_selectors)]
+
+    summary_el = soup.select_one("div.summary blockquote.userstuff")
+
+    return Work(
+        work_id=work_id,
+        title=title,
+        authors=authors,
+        word_count=_parse_count(soup, "dd.words"),
+        tags=tags,
+        fandoms=[f.get_text(strip=True) for f in soup.select("dd.fandom.tags a.tag")],
+        summary=summary_el.get_text("\n", strip=True) if summary_el else "",
+        series=_text_or_none(soup, "dd.series span.position"),
+        kudos=_parse_count(soup, "dd.kudos"),
+        hits=_parse_count(soup, "dd.hits"),
+        bookmarks=_parse_count(soup, "dd.bookmarks"),
+        chapters=chapters,
+        rating=_text_or_none(soup, "dd.rating.tags a.tag"),
+        complete=_derive_complete(chapters),
+    )
+
+
+async def fetch_single_work(
+    client: AO3Client, settings: Settings, work_id: str
+) -> tuple[list[Work], str | None]:
+    """Look up one work by ID, for a pasted work or chapter URL."""
+    resp = await client.get(f"{settings.base_url}/works/{work_id}", params={"view_adult": "true"})
+
+    if resp.status_code == 404:
+        return [], f"Work {work_id} not found — it may have been deleted or made private."
+    if looks_like_login(resp):
+        return [], f"Work {work_id} is restricted and requires an AO3 login."
+    if resp.status_code != 200:
+        raise AO3Error(f"Unexpected status {resp.status_code} fetching work {work_id}.")
+
+    return [parse_work_page(resp.text, work_id)], None
+
+
 def has_next_page(html: str) -> bool:
     soup = BeautifulSoup(html, "lxml")
     next_el = soup.select_one("ol.pagination li.next")
@@ -106,7 +160,13 @@ def has_next_page(html: str) -> bool:
 
 
 def looks_like_login(resp: httpx.Response) -> bool:
-    return "/users/login" in str(resp.url) or 'id="new_user_session' in resp.text
+    """True when AO3 redirected us to the login page (restricted work).
+
+    Only the final URL is checked: AO3 renders a small login form in the header
+    of *every* page for logged-out visitors, so looking for one in the body
+    matches any public page.
+    """
+    return "/users/login" in str(resp.url)
 
 
 def build_listing_params(req: SearchRequest) -> dict:
@@ -165,6 +225,14 @@ async def search(
     """
     message: str | None = None
     query = req.query
+
+    # A pasted work/chapter URL identifies exactly one work, so it wins over
+    # the Author/Tag toggle and skips listing and pagination entirely.
+    work_id = parse_work_ref(query)
+    if work_id:
+        bus.log("info", f"Recognised a work link — fetching work {work_id} directly.")
+        works, message = await fetch_single_work(client, settings, work_id)
+        return works, message, False
 
     if req.search_type == "author":
         base = f"{settings.base_url}/users/{urllib.parse.quote(query)}/works"

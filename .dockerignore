@@ -1,5 +1,6 @@
 downloads/
 config/
+.env
 .git/
 .gitignore
 README.md
