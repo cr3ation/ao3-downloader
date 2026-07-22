@@ -12,7 +12,7 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    code { font-size: 0.8em; }
+    /* Sizes are set per element with Tailwind so nothing compounds. */
   </style>
 </head>
 <body class="min-h-full bg-slate-950 text-slate-200 antialiased">
@@ -136,41 +136,41 @@
 
           <!-- Search guide -->
           <div id="guide-panel" class="hidden rounded-lg bg-slate-950/60 border border-slate-800/60 p-4 space-y-4">
-            <div class="grid gap-4 md:grid-cols-3">
-              <div>
+            <div class="grid gap-x-6 gap-y-4 md:grid-cols-3">
+              <div class="min-w-0">
                 <h3 class="text-slate-200 text-sm font-medium mb-1">Paste a link</h3>
                 <p class="text-xs text-slate-400 leading-relaxed">
                   Paste any AO3 work or chapter URL to fetch exactly that story — the Author/Tag toggle is ignored.
                 </p>
-                <p class="mt-1.5"><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">archiveofourown.org/works/2755349</code></p>
+                <p class="mt-1.5"><code class="inline-block max-w-full break-all bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">archiveofourown.org/works/2755349</code></p>
               </div>
-              <div>
+              <div class="min-w-0">
                 <h3 class="text-slate-200 text-sm font-medium mb-1">Author</h3>
                 <p class="text-xs text-slate-400 leading-relaxed">
                   The exact AO3 username, as it appears in <span class="text-slate-500">archiveofourown.org/users/<b class="text-slate-300">name</b></span>.
                 </p>
-                <p class="mt-1.5"><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">missyuki1990</code></p>
+                <p class="mt-1.5"><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">missyuki1990</code></p>
               </div>
-              <div>
+              <div class="min-w-0">
                 <h3 class="text-slate-200 text-sm font-medium mb-1">Tag / Fandom</h3>
                 <p class="text-xs text-slate-400 leading-relaxed">
                   Canonical AO3 tags — fandoms, relationships or freeform tags. Unknown tags fall back to AO3's general search.
                 </p>
                 <p class="mt-1.5 flex flex-wrap gap-1">
-                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Harry Potter - J. K. Rowling</code>
-                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Draco Malfoy/Harry Potter</code>
-                  <code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Enemies to Lovers</code>
+                  <code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">Harry Potter - J. K. Rowling</code>
+                  <code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">Draco Malfoy/Harry Potter</code>
+                  <code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">Enemies to Lovers</code>
                 </p>
               </div>
             </div>
             <div class="border-t border-slate-800/60 pt-3">
               <h3 class="text-slate-200 text-sm font-medium mb-1.5">Advanced queries</h3>
               <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-400">
-                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">"exact phrase"</code> exact words</span>
-                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Harry AND Draco</code> both</span>
-                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">Sith OR Jedi</code> either</span>
-                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">-angst</code> exclude</span>
-                <span><code class="bg-slate-800 text-indigo-300 rounded px-1 py-0.5">wolf*</code> wildcard</span>
+                <span><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">"exact phrase"</code> exact words</span>
+                <span><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">Harry AND Draco</code> both</span>
+                <span><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">Sith OR Jedi</code> either</span>
+                <span><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">-angst</code> exclude</span>
+                <span><code class="inline-block bg-slate-800 text-indigo-300 rounded px-1.5 py-0.5 text-[11px] leading-5">wolf*</code> wildcard</span>
               </div>
               <p class="mt-2 text-xs text-slate-500">Filters apply to both Author and Tag searches. Operators work in the general search used as tag fallback.</p>
             </div>
