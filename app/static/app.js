@@ -502,7 +502,7 @@ function libSortValue(file, key) {
     case "author": return (e?.authors?.[0] || "￿").toLowerCase();
     case "words": return e?.word_count ?? -1;
     case "downloaded": return e?.downloaded_at || "";
-    case "size": return file.size;
+    case "size": return file.size ?? -1;
     default: return file.filename;
   }
 }
@@ -518,6 +518,7 @@ function matchesLibFilter(file, needle) {
 }
 
 function formatBytes(n) {
+  if (n == null) return "—";
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   return `${Math.max(1, Math.round(n / 1024))} KB`;
 }
@@ -534,7 +535,7 @@ function renderLibrary() {
 
   for (const cat of state.library.categories) {
     const files = cat.files.filter((f) => matchesLibFilter(f, needle));
-    if (files.length === 0) continue;
+    if (files.length === 0) continue; // nothing matched the text filter
     files.sort((a, b) => {
       const va = libSortValue(a, sortKey);
       const vb = libSortValue(b, sortKey);
@@ -547,9 +548,12 @@ function renderLibrary() {
     section.className = "px-5 py-4";
     const header = document.createElement("h3");
     header.className = "text-sm font-medium text-slate-300 mb-3";
-    const totalSize = files.reduce((s, f) => s + f.size, 0);
-    const displayName = cat.name === "_root" ? "Downloads folder (awaiting Calibre import)" : cat.name;
-    header.textContent = `${displayName} · ${files.length} ${files.length === 1 ? "book" : "books"} · ${formatBytes(totalSize)}`;
+    const onDisk = files.filter((f) => f.present);
+    const totalSize = onDisk.reduce((s, f) => s + f.size, 0);
+    const displayName = cat.name === "_root" ? "Downloads" : cat.name;
+    const parts = [displayName, `${files.length} ${files.length === 1 ? "book" : "books"}`];
+    parts.push(onDisk.length ? `${onDisk.length} on disk · ${formatBytes(totalSize)}` : "all imported");
+    header.textContent = parts.join(" · ");
     section.appendChild(header);
 
     const table = document.createElement("table");
@@ -600,6 +604,13 @@ function libraryRow(category, file) {
     head.appendChild(author);
   }
   for (const badge of workBadges(e || {})) head.appendChild(badge);
+  if (!file.present) {
+    const imported = document.createElement("span");
+    imported.className = "text-[11px] rounded px-1.5 py-0.5 border border-slate-700 text-slate-400";
+    imported.textContent = "Imported";
+    imported.title = "No longer in the downloads folder — Calibre has picked it up.";
+    head.appendChild(imported);
+  }
   tdTitle.appendChild(head);
 
   const tdWords = document.createElement("td");
@@ -623,17 +634,19 @@ function libraryRow(category, file) {
 
   const tdActions = document.createElement("td");
   tdActions.className = "py-2.5 pl-3 whitespace-nowrap text-right";
-  const fileUrl = `/api/downloads/${encodeURIComponent(category)}/${encodeURIComponent(file.filename)}`;
-  const dl = document.createElement("a");
-  dl.href = fileUrl;
-  dl.setAttribute("download", "");
-  dl.className = "text-sm text-indigo-400 hover:text-indigo-300 mr-4";
-  dl.textContent = "Download";
+  if (file.present) {
+    const dl = document.createElement("a");
+    dl.href = `/api/downloads/${encodeURIComponent(category)}/${encodeURIComponent(file.filename)}`;
+    dl.setAttribute("download", "");
+    dl.className = "text-sm text-indigo-400 hover:text-indigo-300 mr-4";
+    dl.textContent = "Download";
+    tdActions.appendChild(dl);
+  }
   const del = document.createElement("button");
   del.className = "text-sm text-red-400 hover:text-red-300";
-  del.textContent = "Delete";
+  del.textContent = file.present ? "Delete" : "Forget";
   del.addEventListener("click", () => deleteLibraryFile(category, file));
-  tdActions.append(dl, del);
+  tdActions.appendChild(del);
 
   tr.append(tdTitle, tdWords, tdFormat, tdSize, tdDate, tdActions);
   return tr;
@@ -641,7 +654,10 @@ function libraryRow(category, file) {
 
 async function deleteLibraryFile(category, file) {
   const title = file.entry?.title || file.filename;
-  if (!confirm(`Delete "${title}"? This removes the file and its metadata entry.`)) return;
+  const prompt = file.present
+    ? `Delete "${title}"? This removes the file and its library entry.`
+    : `Forget "${title}"? The file is already gone; this only drops the record, so the work will be downloaded again next time you select it.`;
+  if (!confirm(prompt)) return;
   try {
     const resp = await fetch(`/api/downloads/${encodeURIComponent(category)}/${encodeURIComponent(file.filename)}`, {
       method: "DELETE",

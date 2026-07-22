@@ -143,21 +143,48 @@ async def api_job_detail(job_id: str, request: Request) -> dict:
 
 
 def _category_listing(folder: Path, meta_folder: Path, name: str) -> dict:
+    """List everything downloaded for a category.
+
+    Driven by metadata rather than the filesystem: Calibre's automatic adding
+    removes each file once imported, so a file-only listing would go blank.
+    """
     meta = load_metadata(meta_folder)
     by_filename = {entry.get("filename"): (wid, entry) for wid, entry in meta.items()}
+
     files = []
-    for f in sorted(folder.iterdir()):
-        if not f.is_file() or f.name == METADATA_FILE or f.name.endswith(".part") or f.name.startswith("."):
+    on_disk: set[str] = set()
+    if folder.exists():
+        for f in sorted(folder.iterdir()):
+            if not f.is_file() or f.name == METADATA_FILE or f.name.endswith(".part") or f.name.startswith("."):
+                continue
+            on_disk.add(f.name)
+            work_id, entry = by_filename.get(f.name, (None, None))
+            files.append(
+                {
+                    "filename": f.name,
+                    "size": f.stat().st_size,
+                    "work_id": work_id,
+                    "entry": entry,
+                    "present": True,
+                }
+            )
+
+    # Recorded downloads whose file is gone — imported by Calibre, or removed.
+    for work_id, entry in meta.items():
+        filename = entry.get("filename")
+        if not filename or filename in on_disk:
             continue
-        work_id, entry = by_filename.get(f.name, (None, None))
         files.append(
             {
-                "filename": f.name,
-                "size": f.stat().st_size,
+                "filename": filename,
+                "size": None,
                 "work_id": work_id,
                 "entry": entry,
+                "present": False,
             }
         )
+
+    files.sort(key=lambda f: f["filename"].lower())
     return {"name": name, "files": files, "metadata_entries": len(meta)}
 
 
@@ -165,13 +192,24 @@ def _category_listing(folder: Path, meta_folder: Path, name: str) -> dict:
 async def api_downloads(request: Request) -> dict:
     settings: Settings = request.app.state.settings
     categories = []
-    if settings.downloads_dir.exists():
-        # Flat-mode files live directly in the downloads root.
-        root = _category_listing(settings.downloads_dir, settings.config_dir, ROOT_CATEGORY)
-        if root["files"] or root["metadata_entries"]:
-            categories.append(root)
-        for folder in sorted(p for p in settings.downloads_dir.iterdir() if p.is_dir()):
-            categories.append(_category_listing(folder, settings.config_dir / folder.name, folder.name))
+
+    # Flat-mode files live directly in the downloads root.
+    root = _category_listing(settings.downloads_dir, settings.config_dir, ROOT_CATEGORY)
+    if root["files"] or root["metadata_entries"]:
+        categories.append(root)
+
+    # Union of both trees: a category survives Calibre emptying (or removing)
+    # its download folder as long as its metadata is still around.
+    names = set()
+    for base in (settings.downloads_dir, settings.config_dir):
+        if base.exists():
+            names.update(p.name for p in base.iterdir() if p.is_dir())
+
+    for name in sorted(names):
+        listing = _category_listing(settings.downloads_dir / name, settings.config_dir / name, name)
+        if listing["files"] or listing["metadata_entries"]:
+            categories.append(listing)
+
     return {"categories": categories}
 
 

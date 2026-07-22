@@ -30,7 +30,9 @@ Already-downloaded files are **skipped automatically** (dedup checks the file on
 
 ### Library
 
-The **Library** tab lists everything under `./downloads/`, grouped per category folder and joined with the matching `metadata.json` from `./config/` (title, authors, word count, badges, format, size, download date). You can filter by text, sort locally, download any book to your browser, or delete it — deleting removes both the file and its metadata entry. Files without a metadata entry (e.g. dropped in manually) still show up by filename.
+The **Library** tab lists **everything the app has downloaded**, according to `./config/metadata.json` — title, authors, word count, badges, format, size and download date. You can filter by text and sort locally.
+
+Entries whose file is still in `./downloads/` offer **Download** (saves it to your browser) and **Delete** (removes the file and the record). Entries Calibre has already imported are marked **Imported** — their file is gone from the watch folder, so only **Forget** is offered, which drops the record and lets the work be downloaded again. Files without a metadata entry (e.g. dropped in manually) still show up by filename.
 
 ## Politeness & rate limiting
 
@@ -98,7 +100,7 @@ Note: setting tags from the *filename* is not possible in Calibre — its filena
 - Calibre **removes files from the watched folder** after importing them. The app keeps its own memory in `./config/metadata.json`, so already-imported works are skipped ("downloaded earlier, per metadata") instead of re-downloaded. To deliberately re-download a work, delete its entry via the Library tab (or edit the file).
 - **`metadata.json` is no longer written to the watched folder** — it lives in the separate `./config/` volume, so Calibre only ever finds e-books there.
 - In-progress downloads briefly use a temporary `.part` file in the download folder before being atomically renamed into place, so a half-written book can never be imported. Calibre's automatic adding only picks up known e-book extensions by default and ignores these. If you enable **"add all file types"** in the Automatic adding tab, add `part` to the ignored extensions.
-- The Library tab shows files under "Downloads folder (awaiting Calibre import)" until Calibre picks them up — an empty list there simply means Calibre has imported everything.
+- The Library tab keeps listing works after Calibre has imported them (marked **Imported**), because it is driven by `metadata.json` rather than by what is currently in the watch folder.
 - The embedded tag only works for **EPUB** (the other formats are passed through untouched), so keep EPUB as the download format for the Calibre workflow.
 
 ## API (used by the UI, handy for scripting)

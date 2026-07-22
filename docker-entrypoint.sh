@@ -34,11 +34,20 @@ usermod -o -u "$PUID" -g "$RUN_GROUP" appuser
 chown -R "$PUID:$PGID" /app/config 2>/dev/null || true
 chown "$PUID:$PGID" /app/downloads 2>/dev/null || true
 
-# Fail loudly here rather than with an opaque traceback from uvicorn.
+# Self-heal unreadable code. COPY preserves the build host's modes, and git
+# under a tight umask can produce directories only the owner may enter — which
+# leaves the code unreadable once we switch to an arbitrary PUID.
+# Only the code is touched: /app/downloads may hold thousands of files.
 if ! gosu appuser test -r /app/app/main.py; then
-    echo "[entrypoint] ERROR: uid $PUID cannot read /app/app — rebuild the image (docker compose up -d --build)." >&2
+    echo "[entrypoint] Code not readable by uid $PUID — repairing permissions."
+    chmod a+rX /app 2>/dev/null || true
+    chmod -R a+rX /app/app 2>/dev/null || true
+fi
+
+if ! gosu appuser test -r /app/app/main.py; then
+    echo "[entrypoint] ERROR: uid $PUID still cannot read /app/app. Rebuild with: docker compose up -d --build" >&2
     exit 1
 fi
 
-echo "[entrypoint] Starting as appuser (uid=$PUID gid=$PGID, TZ=$TZ)."
+echo "[entrypoint] ao3-downloader v2 — starting as appuser (uid=$PUID gid=$PGID, TZ=$TZ)."
 exec gosu appuser "$@"
