@@ -30,9 +30,21 @@
     </header>
 
     <!-- Tabs -->
-    <nav class="flex gap-1 border-b border-slate-800">
-      <button data-tab="search" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-500 text-white">Search</button>
-      <button data-tab="library" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Library</button>
+    <nav class="flex items-center justify-between gap-4 border-b border-slate-800">
+      <div class="flex gap-1">
+        <button data-tab="search" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-500 text-white">Search</button>
+        <button data-tab="library" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Library</button>
+      </div>
+      <div class="flex items-center gap-4 pb-2 text-sm">
+        <span class="text-slate-500">{{ user.username }}{% if user.is_admin %} · admin{% endif %}</span>
+        {% if user.is_admin %}
+          <a href="/system/accounts" class="text-slate-400 hover:text-slate-200">System</a>
+        {% endif %}
+        <form method="post" action="/logout" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="text-slate-400 hover:text-slate-200">Log out</button>
+        </form>
+      </div>
     </nav>
 
     <!-- ============================== SEARCH TAB ============================== -->
@@ -257,6 +269,6 @@
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ app_js_version }}"></script>
 </body>
 </html>

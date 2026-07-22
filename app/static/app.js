@@ -67,7 +67,15 @@ es.addEventListener("job_done", (e) => {
   state.library.loaded = false; // stale now — refetch on next Library visit
 });
 
-es.onerror = () => showBanner();
+es.onerror = () => {
+  // A 401 closes the stream permanently rather than retrying, so a signed-out
+  // session would otherwise sit behind the reconnect banner forever.
+  if (es.readyState === EventSource.CLOSED) {
+    window.location = "/login?ok=session_expired";
+    return;
+  }
+  showBanner();
+};
 es.onopen = () => hideBanner();
 
 function showBanner() {
