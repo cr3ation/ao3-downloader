@@ -13,7 +13,7 @@ RUN pip install -r requirements.txt
 
 COPY app/ ./app/
 
-RUN mkdir -p /app/downloads && chown -R appuser:appuser /app
+RUN mkdir -p /app/downloads /app/config && chown -R appuser:appuser /app
 
 USER appuser
 

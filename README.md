@@ -10,7 +10,9 @@ docker compose up -d --build
 
 Then open **http://localhost:8067**.
 
-Downloaded files appear on the host in the `./downloads/` bind mount, named `Title - Author.ext`. With the default `docker-compose.yml` (Calibre mode, see below) all files land directly in the downloads root; set `FLAT_DOWNLOADS: "false"` to instead get per-search subfolders (`./downloads/<search query>/...`). Either way a `metadata.json` records title, authors, word count, tags, fandoms, stats and summary for each work (keyed by AO3 work ID).
+Downloaded files appear on the host in the `./downloads/` bind mount, named `Title - Author.ext`. With the default `docker-compose.yml` (Calibre mode, see below) all files land directly in the downloads root; set `FLAT_DOWNLOADS: "false"` to instead get per-search subfolders (`./downloads/<search query>/...`).
+
+**`./downloads/` only ever contains e-books.** The app's record of what it has downloaded (`metadata.json` — title, authors, word count, tags, fandoms, stats and summary per work, keyed by AO3 work ID) lives in a separate `./config/` volume, so nothing unexpected sits in a folder Calibre is watching.
 
 ## Using the app
 
@@ -25,7 +27,7 @@ Already-downloaded files are **skipped automatically** (dedup checks the file on
 
 ### Library
 
-The **Library** tab lists everything under `./downloads/`, grouped per category folder and joined with each folder's `metadata.json` (title, authors, word count, badges, format, size, download date). You can filter by text, sort locally, download any book to your browser, or delete it — deleting removes both the file and its metadata entry. Files without a metadata entry (e.g. dropped in manually) still show up by filename.
+The **Library** tab lists everything under `./downloads/`, grouped per category folder and joined with the matching `metadata.json` from `./config/` (title, authors, word count, badges, format, size, download date). You can filter by text, sort locally, download any book to your browser, or delete it — deleting removes both the file and its metadata entry. Files without a metadata entry (e.g. dropped in manually) still show up by filename.
 
 ## Politeness & rate limiting
 
@@ -54,7 +56,8 @@ Set in `docker-compose.yml` (defaults shown):
 | `EPUB_TAG` | `Fanfiction` | Tag embedded in every downloaded EPUB's metadata (imported by Calibre); `""` disables |
 | `FLAT_DOWNLOADS` | `false` (set `true` in compose) | Save files in the downloads root instead of per-search subfolders |
 | `USER_AGENT` | Chrome UA | Outgoing User-Agent header |
-| `DOWNLOADS_DIR` | `/app/downloads` | Download target inside the container |
+| `DOWNLOADS_DIR` | `/app/downloads` | Download target inside the container (e-books only) |
+| `CONFIG_DIR` | `/app/config` | Where `metadata.json` is kept, outside the Calibre watch folder |
 
 ## Calibre integration
 
@@ -67,6 +70,7 @@ In `docker-compose.yml`, set the host side of the volume to the folder Calibre w
 ```yaml
 volumes:
   - /Users/you/CalibreAutoAdd:/app/downloads
+  - ./config:/app/config          # app state — keep OUT of the watched folder
 ```
 
 In Calibre: **Preferences → Import/export → Adding books → Automatic adding tab** → set "Specify a folder..." to that same folder.
@@ -84,8 +88,9 @@ Note: setting tags from the *filename* is not possible in Calibre — its filena
 
 ### 3. Housekeeping notes
 
-- Calibre **removes files from the watched folder** after importing them. The app keeps its own memory in `metadata.json`, so already-imported works are skipped ("downloaded earlier, per metadata") instead of re-downloaded. To deliberately re-download a work, delete its entry via the Library tab (or edit `metadata.json`).
-- `metadata.json` and temporary `.part` files are not e-book formats, so Calibre's automatic adding leaves them alone. If you enabled "add all file types" in the Automatic adding tab, add `json` and `part` to the ignored extensions.
+- Calibre **removes files from the watched folder** after importing them. The app keeps its own memory in `./config/metadata.json`, so already-imported works are skipped ("downloaded earlier, per metadata") instead of re-downloaded. To deliberately re-download a work, delete its entry via the Library tab (or edit the file).
+- **`metadata.json` is no longer written to the watched folder** — it lives in the separate `./config/` volume, so Calibre only ever finds e-books there.
+- In-progress downloads briefly use a temporary `.part` file in the download folder before being atomically renamed into place, so a half-written book can never be imported. Calibre's automatic adding only picks up known e-book extensions by default and ignores these. If you enable **"add all file types"** in the Automatic adding tab, add `part` to the ignored extensions.
 - The Library tab shows files under "Downloads folder (awaiting Calibre import)" until Calibre picks them up — an empty list there simply means Calibre has imported everything.
 - The embedded tag only works for **EPUB** (the other formats are passed through untouched), so keep EPUB as the download format for the Calibre workflow.
 

@@ -20,6 +20,7 @@ class Settings:
     retry_after_cap: float
     request_timeout: float
     downloads_dir: Path
+    config_dir: Path
     user_agent: str
     max_results_cap: int
     max_pages: int
@@ -38,6 +39,8 @@ class Settings:
             retry_after_cap=float(os.getenv("RETRY_AFTER_CAP", "1800")),
             request_timeout=float(os.getenv("REQUEST_TIMEOUT", "60")),
             downloads_dir=Path(os.getenv("DOWNLOADS_DIR", "/app/downloads")),
+            # Kept out of downloads_dir so Calibre's watched folder holds only e-books.
+            config_dir=Path(os.getenv("CONFIG_DIR", "/app/config")),
             user_agent=os.getenv("USER_AGENT", DEFAULT_USER_AGENT),
             max_results_cap=int(os.getenv("MAX_RESULTS_CAP", "500")),
             max_pages=int(os.getenv("MAX_PAGES", "50")),

@@ -1,6 +1,7 @@
 """FastAPI application: routes, SSE stream, and lifecycle wiring."""
 import asyncio
 import json
+import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -22,6 +23,32 @@ SSE_KEEPALIVE_SECONDS = 15
 ROOT_CATEGORY = "_root"
 
 
+def _migrate_metadata(settings: Settings, bus: EventBus) -> None:
+    """Move metadata.json out of downloads_dir (pre-config_dir layout).
+
+    Losing it would make the app re-download everything Calibre has already
+    imported, so the files are moved rather than left behind.
+    """
+    sources = [(settings.downloads_dir / METADATA_FILE, settings.config_dir / METADATA_FILE)]
+    if settings.downloads_dir.exists():
+        for folder in settings.downloads_dir.iterdir():
+            if folder.is_dir():
+                sources.append((folder / METADATA_FILE, settings.config_dir / folder.name / METADATA_FILE))
+
+    for src, dst in sources:
+        if not src.exists() or dst.exists():
+            continue
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            # shutil.move, not os.replace: the two volumes are separate mounts.
+            shutil.move(str(src), str(dst))
+            bus.log("info", f"Moved {src} to {dst} (metadata now lives outside the downloads folder).")
+        except OSError as exc:
+            # Never let a migration failure take down startup — worst case the
+            # old file stays put and dedup starts from an empty record.
+            bus.log("warning", f"Could not move {src} to {dst}: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings.from_env()
@@ -29,6 +56,8 @@ async def lifespan(app: FastAPI):
     client = AO3Client(settings, bus)
     manager = DownloadManager(client, settings, bus)
     settings.downloads_dir.mkdir(parents=True, exist_ok=True)
+    settings.config_dir.mkdir(parents=True, exist_ok=True)
+    _migrate_metadata(settings, bus)
     manager.start()
 
     app.state.settings = settings
@@ -105,8 +134,8 @@ async def api_job_detail(job_id: str, request: Request) -> dict:
     return job.detail()
 
 
-def _category_listing(folder: Path, name: str) -> dict:
-    meta = load_metadata(folder)
+def _category_listing(folder: Path, meta_folder: Path, name: str) -> dict:
+    meta = load_metadata(meta_folder)
     by_filename = {entry.get("filename"): (wid, entry) for wid, entry in meta.items()}
     files = []
     for f in sorted(folder.iterdir()):
@@ -130,29 +159,32 @@ async def api_downloads(request: Request) -> dict:
     categories = []
     if settings.downloads_dir.exists():
         # Flat-mode files live directly in the downloads root.
-        root = _category_listing(settings.downloads_dir, ROOT_CATEGORY)
+        root = _category_listing(settings.downloads_dir, settings.config_dir, ROOT_CATEGORY)
         if root["files"] or root["metadata_entries"]:
             categories.append(root)
         for folder in sorted(p for p in settings.downloads_dir.iterdir() if p.is_dir()):
-            categories.append(_category_listing(folder, folder.name))
+            categories.append(_category_listing(folder, settings.config_dir / folder.name, folder.name))
     return {"categories": categories}
 
 
-def _resolve_library_file(settings: Settings, category: str, filename: str) -> Path:
+def _resolve_library_file(settings: Settings, category: str, filename: str) -> tuple[Path, Path]:
+    """Returns (file path in downloads_dir, matching metadata folder in config_dir)."""
     if filename == METADATA_FILE or filename.endswith(".part"):
         raise HTTPException(status_code=400, detail="Invalid path.")
     if category == ROOT_CATEGORY:
         path = safe_child(settings.downloads_dir, filename)
+        meta_folder = settings.config_dir
     else:
         path = safe_child(settings.downloads_dir, category, filename)
-    if path is None:
+        meta_folder = safe_child(settings.config_dir, category)
+    if path is None or meta_folder is None:
         raise HTTPException(status_code=400, detail="Invalid path.")
-    return path
+    return path, meta_folder
 
 
 @app.get("/api/downloads/{category}/{filename}")
 async def api_download_file(category: str, filename: str, request: Request) -> FileResponse:
-    path = _resolve_library_file(request.app.state.settings, category, filename)
+    path, _ = _resolve_library_file(request.app.state.settings, category, filename)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
     return FileResponse(path, filename=path.name, media_type="application/octet-stream")
@@ -162,11 +194,11 @@ async def api_download_file(category: str, filename: str, request: Request) -> F
 async def api_delete_file(category: str, filename: str, request: Request) -> dict:
     # async def with no await between metadata load and write: the read-modify-
     # write cannot interleave with the download worker's on the event loop.
-    path = _resolve_library_file(request.app.state.settings, category, filename)
+    path, meta_folder = _resolve_library_file(request.app.state.settings, category, filename)
     file_removed = path.is_file()
     if file_removed:
         path.unlink()
-    metadata_removed = remove_metadata_entry(path.parent, filename)
+    metadata_removed = remove_metadata_entry(meta_folder, filename)
     if not file_removed and not metadata_removed:
         raise HTTPException(status_code=404, detail="File not found.")
     bus: EventBus = request.app.state.bus

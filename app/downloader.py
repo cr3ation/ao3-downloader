@@ -104,9 +104,13 @@ class DownloadManager:
     async def _run_job(self, job: Job) -> None:
         if self._settings.flat_downloads:
             folder = self._settings.downloads_dir
+            meta_folder = self._settings.config_dir
         else:
-            folder = self._settings.downloads_dir / sanitize_filename(job.category, fallback="uncategorized")
+            sub = sanitize_filename(job.category, fallback="uncategorized")
+            folder = self._settings.downloads_dir / sub
+            meta_folder = self._settings.config_dir / sub
         folder.mkdir(parents=True, exist_ok=True)
+        meta_folder.mkdir(parents=True, exist_ok=True)
         total = len(job.items)
 
         for i, item in enumerate(job.items, start=1):
@@ -119,7 +123,7 @@ class DownloadManager:
             }
             self._bus.publish("progress", self._current_progress)
 
-            path = self._target_path(folder, work, job.format)
+            path = self._target_path(folder, meta_folder, work, job.format)
             item.filename = path.name
 
             if path.exists():
@@ -132,7 +136,7 @@ class DownloadManager:
             # The file may be gone because Calibre's automatic adding imported
             # and removed it — metadata.json is the durable memory of what was
             # already downloaded.
-            entry = load_metadata(folder).get(work.work_id)
+            entry = load_metadata(meta_folder).get(work.work_id)
             if entry and entry.get("format") == job.format:
                 item.status = ItemStatus.skipped
                 item.message = "Already downloaded earlier (file since imported/removed)"
@@ -163,7 +167,7 @@ class DownloadManager:
                     self._bus.log("warning", f"Could not embed tag in EPUB for {work.title}: {exc}")
 
             atomic_write_bytes(path, data)
-            self._update_metadata(folder, work, path.name, job.format)
+            self._update_metadata(meta_folder, work, path.name, job.format)
             item.status = ItemStatus.done
             self._bus.log("info", f"Downloaded: {path.name} ({len(data) // 1024} KB)")
             self._publish_item(job, item)
@@ -196,7 +200,7 @@ class DownloadManager:
             },
         )
 
-    def _target_path(self, folder: Path, work: Work, fmt: str) -> Path:
+    def _target_path(self, folder: Path, meta_folder: Path, work: Work, fmt: str) -> Path:
         author = work.authors[0] if work.authors else "Anonymous"
         if len(work.authors) > 1:
             author += " et al"
@@ -205,7 +209,7 @@ class DownloadManager:
 
         # Same title+author from a different work must not overwrite: consult
         # metadata.json and disambiguate with the (globally unique) work id.
-        metadata = self._load_metadata(folder)
+        metadata = self._load_metadata(meta_folder)
         claimed_by = next(
             (wid for wid, entry in metadata.items() if entry.get("filename") == path.name),
             None,

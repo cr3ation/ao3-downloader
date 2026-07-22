@@ -8,7 +8,11 @@ services:
       # Set the host path (left side) to the SAME folder Calibre watches for
       # automatic adding (calibre > Preferences > Adding books > Automatic adding),
       # e.g.:  - /Users/you/CalibreAutoAdd:/app/downloads
+      # Only e-books are ever written here, so Calibre finds nothing unexpected.
       - ./downloads:/app/downloads
+      # App state (metadata.json — the record of what has been downloaded).
+      # Keep this OUT of the Calibre watch folder.
+      - ./config:/app/config
     environment:
       AO3_MIN_DELAY: "3"
       AO3_MAX_DELAY: "6"
