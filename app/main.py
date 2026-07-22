@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import scraper
@@ -74,8 +74,16 @@ app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
 
 @app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(APP_DIR / "templates" / "index.html")
+async def index() -> HTMLResponse:
+    """Serve the page with a cache-busted app.js URL.
+
+    Without this a browser can pair freshly served HTML with a cached older
+    app.js, leaving new controls wired to nothing.
+    """
+    script = APP_DIR / "static" / "app.js"
+    html = (APP_DIR / "templates" / "index.html").read_text(encoding="utf-8")
+    html = html.replace("/static/app.js", f"/static/app.js?v={int(script.stat().st_mtime)}")
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/healthz")
