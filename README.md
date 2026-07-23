@@ -79,7 +79,7 @@ PUBLIC_BASE_URL=https://ao3.example.com
 SESSION_COOKIE_SECURE=true
 ```
 
-`PUBLIC_BASE_URL` forces the redirect URI to `https://ao3.example.com/auth/oidc/callback` regardless of proxy headers. (The alternative is to leave it unset and set `FORWARDED_ALLOW_IPS` to the proxy's IP — or `*` on a trusted network — so uvicorn trusts `X-Forwarded-Proto`; `PUBLIC_BASE_URL` is the more predictable of the two.) Open **System → Settings** and check that the Redirect URI shown there now reads `https://…` — if it still shows `http://` or an internal host, the above isn't taking effect.
+`PUBLIC_BASE_URL` fixes the redirect URI to `https://ao3.example.com/auth/oidc/callback` no matter what headers arrive — this is the one that matters. With it set, **leave `FORWARDED_ALLOW_IPS` at its default** (`127.0.0.1`): it then only decides whether logs and the login throttle see the real client IP or the proxy, and pinning it to a specific address is fiddly anyway — when containers are reached through published host ports, uvicorn sees Docker's internal gateway (`172.x.x.x`), not the proxy's LAN IP or your public IP. If you want real client IPs in the logs, set `FORWARDED_ALLOW_IPS=*` (safe as long as the raw app port isn't directly reachable). Then open **System → Settings** and check the Redirect URI shown there reads `https://…` — if it still shows `http://` or an internal host, the above isn't taking effect.
 
 **2. In Authentik**, create an **OAuth2/OpenID Provider** and an **Application**:
 
