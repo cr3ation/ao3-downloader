@@ -9,7 +9,7 @@ cp .env.example .env      # optional — edit paths, port, PUID/PGID, timezone
 docker compose up -d --build
 ```
 
-Then open **http://localhost:8067**.
+Then open **http://localhost:8067** and sign in. On the very first start the app creates an administrator account: set `ADMIN_PASSWORD` in `.env` to choose the password, or leave it blank and the app **prints a generated one once** to `docker compose logs ao3-downloader`.
 
 Every setting has a default, so `docker compose up -d --build` works straight after a clone even without a `.env` file. `.env` is git-ignored, which means **`git pull` never overwrites your local paths** — handy when the same repo runs on both a laptop and a NAS. See [`.env.example`](.env.example) for every option.
 
@@ -33,6 +33,47 @@ Already-downloaded files are **skipped automatically** (dedup checks the file on
 The **Library** tab lists **everything the app has downloaded**, according to `./config/metadata.json` — title, authors, word count, badges, format, size and download date. You can filter by text and sort locally.
 
 Entries whose file is still in `./downloads/` offer **Download** (saves it to your browser) and **Delete** (removes the file and the record). Entries Calibre has already imported are marked **Imported** — their file is gone from the watch folder, so only **Forget** is offered, which drops the record and lets the work be downloaded again. Files without a metadata entry (e.g. dropped in manually) still show up by filename.
+
+## Accounts & access
+
+The whole app — every page and API endpoint — is behind a login. There are two roles:
+
+- **admin** — everything, including the **System** tab (accounts and SSO settings).
+- **user** — search, download and manage the library, but no System access.
+
+Admins manage accounts under **System → Accounts**: create local users, change passwords, set roles, and delete accounts. The last remaining admin cannot be deleted or demoted, so you can never lock the installation out of its own administration.
+
+### First-boot password and recovery
+
+- **Choosing the first password:** set `ADMIN_PASSWORD` in `.env` before the first start. It is read *only* while the database has no users; changing it later does nothing.
+- **Generated password:** leave `ADMIN_PASSWORD` blank and the app prints a strong one once to the logs. It is never written to disk.
+- **Forgot the password:** set `ADMIN_PASSWORD_RESET` in `.env`, run `docker compose up -d`, and the admin account is reset to it and re-promoted (its sessions are revoked). Blank the variable and restart afterwards — it re-applies on every boot while set.
+- **Offline surgery:**
+
+  ```bash
+  docker compose exec --user appuser ao3-downloader python -m app.adminctl list
+  docker compose exec --user appuser ao3-downloader python -m app.adminctl reset-password <user> <new-password>
+  ```
+
+  The `--user appuser` is important: `docker compose exec` bypasses the entrypoint and would otherwise run as root, leaving root-owned `app.db-wal`/`app.db-shm` files the app can no longer write. (`python:3.12-slim` ships no `sqlite3` CLI, so this is the supported path.)
+
+### Cookies over plain HTTP
+
+Over `http://<ip>:<port>` on your LAN, the login password and session cookie cross the network **in cleartext**. That is acceptable on a home network and **not** for anything reachable from the internet. If you expose the app, put it behind HTTPS and set `SESSION_COOKIE_SECURE=true`. The default `auto` marks the cookie `Secure` only over HTTPS — setting it `true` on plain HTTP would make the browser silently discard the cookie, which looks exactly like a wrong password.
+
+## Single sign-on (OIDC / OAuth2)
+
+Configure SSO entirely in the GUI under **System → Settings** — no restart, nothing in `.env`. It works with Authentik, Keycloak, and any standard OpenID Connect provider.
+
+1. In your identity provider, create an OAuth2/OIDC application. Copy the **Redirect URI** shown on the Settings page into it (it is derived from how you reach the app — make sure the scheme matches).
+2. Back on the Settings page, tick **Enable SSO**, paste the **issuer/discovery URL**, **client ID** and **client secret**, and save. A **Log in with SSO** button appears on the login page immediately.
+3. On first SSO login the app creates a local account automatically (**just-in-time provisioning**) with the **user** role. Grant admin rights afterwards under Accounts.
+
+Notes:
+
+- **Account adoption:** if an SSO user's name matches an existing *local* account, the two are linked and the existing role is kept. In a household where you own the identity provider this is what you want; be aware of it if the provider is shared.
+- **Reverse proxies:** if the app sits behind one and the redirect URI comes out `http://` when you actually use HTTPS, set `FORWARDED_ALLOW_IPS` (so uvicorn trusts the proxy's `X-Forwarded-Proto`) or hard-override it with `PUBLIC_BASE_URL`. The Settings page warns you when the URI looks wrong.
+- **No single-logout:** signing out clears the local session only; it does not sign you out of the identity provider.
 
 ## Politeness & rate limiting
 
