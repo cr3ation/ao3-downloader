@@ -1,0 +1,101 @@
+{% extends "system_base.html" %}
+{% block title %}Accounts · AO3 Downloader{% endblock %}
+
+{% block system_body %}
+<section class="bg-slate-900 border border-slate-800 rounded-xl">
+  <div class="px-5 py-4 border-b border-slate-800">
+    <h2 class="text-sm font-medium text-slate-300">Accounts</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
+          <th class="px-5 py-3">Username</th>
+          <th class="px-2 py-3">Role</th>
+          <th class="px-2 py-3">Provider</th>
+          <th class="px-2 py-3 whitespace-nowrap">Created</th>
+          <th class="px-5 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/60">
+        {% for u in users %}
+        <tr>
+          <td class="px-5 py-3">
+            <span class="text-slate-200">{{ u.username }}</span>
+            {% if u.id == current_user.id %}<span class="text-slate-500 text-xs">(you)</span>{% endif %}
+          </td>
+          <td class="px-2 py-3">
+            <form method="post" action="/system/accounts/{{ u.id }}/role" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <select name="role" data-autosubmit
+                      class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      {% if u.role == 'admin' and only_one_admin %}disabled title="The last administrator cannot be demoted."{% endif %}>
+                <option value="user"  {% if u.role == 'user'  %}selected{% endif %}>user</option>
+                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>admin</option>
+              </select>
+            </form>
+          </td>
+          <td class="px-2 py-3">
+            <span class="text-[11px] rounded px-1.5 py-0.5 {% if u.provider == 'oidc' %}bg-indigo-900/60 text-indigo-300{% else %}bg-slate-800 text-slate-400{% endif %}">{{ u.provider }}</span>
+          </td>
+          <td class="px-2 py-3 text-slate-500 whitespace-nowrap">{{ u.created_at[:10] }}</td>
+          <td class="px-5 py-3 text-right whitespace-nowrap">
+            {% if u.provider == 'local' %}
+              <button type="button" class="text-indigo-400 hover:text-indigo-300 mr-3"
+                      onclick="document.getElementById('pw-{{ u.id }}').classList.toggle('hidden')">Password</button>
+            {% endif %}
+            <form method="post" action="/system/accounts/{{ u.id }}/delete" class="inline"
+                  data-confirm="{% if u.id == current_user.id %}Delete your own account? You will be signed out immediately.{% else %}Delete the account &quot;{{ u.username }}&quot;?{% endif %}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="text-red-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                      {% if u.role == 'admin' and only_one_admin %}disabled title="The last administrator cannot be deleted."{% endif %}>Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% if u.provider == 'local' %}
+        <tr id="pw-{{ u.id }}" class="hidden bg-slate-950/40">
+          <td colspan="5" class="px-5 py-3">
+            <form method="post" action="/system/accounts/{{ u.id }}/password" class="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <label class="text-sm">
+                <span class="block text-slate-400 mb-1">New password for {{ u.username }}</span>
+                <input name="password" type="password" required minlength="8"
+                       class="w-64 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+              <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg px-4 py-2">Set password</button>
+              <span class="text-xs text-slate-500">Signs the account out everywhere.</span>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+  <h2 class="text-sm font-medium text-slate-300 mb-4">Add local account</h2>
+  <form method="post" action="/system/accounts" class="flex flex-wrap items-end gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="text-sm">
+      <span class="block text-slate-400 mb-1">Username</span>
+      <input name="username" required
+             class="w-48 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <label class="text-sm">
+      <span class="block text-slate-400 mb-1">Password</span>
+      <input name="password" type="password" required minlength="8"
+             class="w-48 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <label class="text-sm">
+      <span class="block text-slate-400 mb-1">Role</span>
+      <select name="role" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="user" selected>user</option>
+        <option value="admin">admin</option>
+      </select>
+    </label>
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg px-5 py-2">Create account</button>
+  </form>
+</section>
+{% endblock %}

@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, routes_auth, scraper
+from . import db, routes_auth, routes_system, scraper
 from .ao3_client import AO3Client, AO3Error
 from .auth import AuthMiddleware
 from .bootstrap import apply_password_reset, seed_admin
@@ -93,6 +93,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AO3 Downloader", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.include_router(routes_auth.router)
+app.include_router(routes_system.router)
 # Added last so it runs first: every route above is protected unless it is
 # explicitly listed in auth.PUBLIC_PATHS.
 app.add_middleware(AuthMiddleware, db_path=Settings.from_env().db_path)
