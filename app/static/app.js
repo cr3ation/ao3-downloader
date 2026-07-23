@@ -37,6 +37,29 @@ function switchTab(name) {
   if (name === "library") loadLibrary();
 }
 
+// ---------------------------------------------------------------- User menu
+
+(() => {
+  const btn = $("user-menu-btn");
+  const menu = $("user-menu");
+  if (!btn || !menu) return;
+  const close = () => {
+    menu.classList.add("hidden");
+    btn.setAttribute("aria-expanded", "false");
+  };
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = !menu.classList.toggle("hidden");
+    btn.setAttribute("aria-expanded", String(open));
+  });
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+  });
+})();
+
 // ---------------------------------------------------------------- SSE
 
 const es = new EventSource("/api/events");
