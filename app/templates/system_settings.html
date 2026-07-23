@@ -4,7 +4,7 @@
 {% block system_body %}
 <form method="post" action="/system/settings" class="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <h2 class="text-sm font-medium text-slate-300">OpenID Connect (SSO)</h2>
+  <h2 class="text-sm font-medium text-slate-300">Single sign-on (OIDC)</h2>
 
   <label class="flex items-start gap-3">
     <input type="checkbox" name="enabled" value="true" {% if cfg.enabled %}checked{% endif %}
