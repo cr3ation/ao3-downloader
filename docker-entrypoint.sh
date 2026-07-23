@@ -49,5 +49,5 @@ if ! gosu appuser test -r /app/app/main.py; then
     exit 1
 fi
 
-echo "[entrypoint] ao3-downloader v2 — starting as appuser (uid=$PUID gid=$PGID, TZ=$TZ)."
+echo "[entrypoint] ficfetch — starting as appuser (uid=$PUID gid=$PGID, TZ=$TZ)."
 exec gosu appuser "$@"

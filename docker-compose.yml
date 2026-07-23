@@ -1,7 +1,7 @@
 services:
-  ao3-downloader:
+  ficfetch:
     build: .
-    container_name: ao3-downloader
+    container_name: ficfetch
     ports:
       - "${PORT:-8067}:8000"
     volumes:

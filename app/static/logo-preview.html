@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FicFetch logo variants</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-200 antialiased min-h-screen">
+  <main class="max-w-4xl mx-auto px-6 py-10">
+    <h1 class="text-2xl font-bold text-white mb-1">FicFetch logo variants</h1>
+    <p class="text-sm text-slate-400 mb-8">Comparison only — not part of the app. Pick one; it swaps by changing the filename in the templates.</p>
+
+    <div class="space-y-4">
+      <!-- rows filled by script -->
+    </div>
+
+    <div id="rows" class="space-y-3"></div>
+
+    <h2 class="text-sm font-medium text-slate-300 mt-10 mb-3">As a header lockup</h2>
+    <div id="lockups" class="space-y-3"></div>
+  </main>
+
+  <script>
+    const variants = [
+      ["logo-dark.svg", "dark navy — used in the app"],
+      ["logo-slate.svg", "slate"],
+      ["logo-indigo.svg", "indigo (favicon style)"],
+      ["logo-indigo-light.svg", "indigo light"],
+      ["logo-transparent.svg", "transparent (icon only)"],
+    ];
+    const rows = document.getElementById("rows");
+    for (const [file, label] of variants) {
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-6 bg-slate-900 border border-slate-800 rounded-xl px-5 py-4";
+      row.innerHTML = `
+        <img src="/static/${file}" class="h-16 w-16">
+        <img src="/static/${file}" class="h-10 w-10">
+        <img src="/static/${file}" class="h-8 w-8">
+        <div class="ml-auto text-right">
+          <div class="text-sm text-slate-200">${label}</div>
+          <code class="text-xs text-indigo-300">${file}</code>
+        </div>`;
+      rows.appendChild(row);
+    }
+    const lockups = document.getElementById("lockups");
+    for (const [file, label] of variants) {
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-xl px-5 py-4";
+      row.innerHTML = `
+        <img src="/static/${file}" class="h-8 w-8">
+        <span class="text-xl font-bold text-white">Fic<span class="text-indigo-400">Fetch</span></span>
+        <code class="ml-auto text-xs text-slate-500">${file}</code>`;
+      lockups.appendChild(row);
+    }
+  </script>
+</body>
+</html>

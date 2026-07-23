@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Bakgrund: Mörkare lila från användarikonen (#312E81) -->
+  <rect width="512" height="512" rx="112" fill="#312E81"/>
+  
+  <!-- Boksidor: Ljusare lila från knapparna (#6366F1) -->
+  <path d="M 100 320 C 160 300 215 315 240 330 L 240 395 C 215 380 160 365 100 385 Z" fill="#6366F1"/>
+  <path d="M 412 320 C 352 300 297 315 272 330 L 272 395 C 297 380 352 365 412 385 Z" fill="#6366F1"/>
+
+  <!-- Nedladdningspil: Ljusare lila (#6366F1) -->
+  <path d="M 256 110 L 256 270" stroke="#6366F1" stroke-width="36" stroke-linecap="round"/>
+  <path d="M 180 200 L 256 276 L 332 200" stroke="#6366F1" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Bokrygg / Bas: Dämpad, för lite djup -->
+  <path d="M 140 425 C 200 410 312 410 372 425" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.2" fill="none"/>
+</svg>

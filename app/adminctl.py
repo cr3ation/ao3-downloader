@@ -2,7 +2,7 @@
 
 Run it inside the container as the app user, not root:
 
-    docker compose exec --user appuser ao3-downloader python -m app.adminctl list
+    docker compose exec --user appuser ficfetch python -m app.adminctl list
 
 `docker compose exec` bypasses the entrypoint and would otherwise run as root,
 leaving root-owned app.db-wal/-shm files that the app itself can no longer write.
