@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
-from . import auth, db
+import ipaddress
+from urllib.parse import urlparse
+
+from . import auth, db, oidc
 from .config import Settings
 
 router = APIRouter(prefix="/system")
@@ -169,3 +172,75 @@ async def delete_account(request: Request, user_id: int, csrf_token: str = Form(
     if user.id == request.state.user.id:
         return RedirectResponse("/login?ok=logged_out", status_code=303)
     return _back("accounts", ok="deleted")
+
+
+def _scheme_looks_wrong(uri: str) -> bool:
+    """Warn only when http:// is used to reach a host that isn't clearly local."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "http":
+        return False
+    host = parsed.hostname or ""
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return False
+    try:
+        return not ipaddress.ip_address(host).is_private
+    except ValueError:
+        return True  # a real hostname over http is worth flagging
+
+
+@router.get("/settings")
+async def settings_page(request: Request) -> Response:
+    settings: Settings = request.app.state.settings
+    cfg = oidc.load_oidc_config(settings.db_path)
+    redirect_uri = oidc.redirect_uri(request, settings.public_base_url)
+    return render(
+        request,
+        "system_settings.html",
+        "settings",
+        {
+            "cfg": cfg,
+            "has_secret": bool(cfg.client_secret),  # the value itself never reaches the template
+            "redirect_uri": redirect_uri,
+            "scheme_warning": _scheme_looks_wrong(redirect_uri),
+        },
+    )
+
+
+@router.post("/settings")
+async def save_settings(
+    request: Request,
+    csrf_token: str = Form(""),
+    enabled: str = Form(""),
+    client_id: str = Form(""),
+    client_secret: str = Form(""),
+    clear_secret: str = Form(""),
+    issuer: str = Form(""),
+    scopes: str = Form(""),
+) -> Response:
+    settings: Settings = request.app.state.settings
+    if not _guard_csrf(request, csrf_token):
+        return _back("settings", err="csrf")
+
+    enabled_bool = enabled == "true"
+    issuer = issuer.strip().rstrip("/")
+    client_id = client_id.strip()
+    if enabled_bool and (not client_id or not issuer):
+        return _back("settings", err="oidc_incomplete")
+
+    values = {
+        "oidc.enabled": "true" if enabled_bool else "false",
+        "oidc.client_id": client_id,
+        "oidc.issuer": issuer,
+        "oidc.scopes": scopes.strip() or oidc.DEFAULT_SCOPES,
+    }
+    # Secret: blank submission leaves the stored value untouched; the checkbox
+    # is the only way to erase it. So the secret is never round-tripped through
+    # the browser.
+    if clear_secret == "true":
+        values["oidc.client_secret"] = ""
+    elif client_secret:
+        values["oidc.client_secret"] = client_secret
+
+    db.set_settings(settings.db_path, values, datetime.now(timezone.utc).isoformat())
+    oidc.invalidate_discovery_cache()
+    return _back("settings", ok="settings_saved")

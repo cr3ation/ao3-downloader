@@ -12,6 +12,14 @@ KEYS = ("oidc.enabled", "oidc.client_id", "oidc.client_secret", "oidc.issuer", "
 DEFAULT_SCOPES = "openid profile email"
 CALLBACK_PATH = "/auth/oidc/callback"
 
+# issuer -> (fetched_at_monotonic, discovery document). Populated by the flow in
+# routes_auth; cleared here when settings change so a new issuer is re-discovered.
+_discovery_cache: dict = {}
+
+
+def invalidate_discovery_cache() -> None:
+    _discovery_cache.clear()
+
 
 def load_oidc_config(db_path: Path) -> OidcConfig:
     values = db.get_settings(db_path, "oidc.")
