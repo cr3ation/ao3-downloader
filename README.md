@@ -1,4 +1,8 @@
-# AO3 Downloader
+<p align="center">
+  <img src="app/static/banner.png" alt="FicFetch" width="640">
+</p>
+
+# FicFetch
 
 A self-hosted web app that searches [Archive of Our Own](https://archiveofourown.org) by author, tag/fandom, or work link, and downloads works as e-books (EPUB, PDF, MOBI, HTML, AZW3) via AO3's own download endpoints. A global rate limiter keeps it polite, and it's built to feed [Calibre](https://calibre-ebook.com/)'s auto-import.
 
@@ -9,7 +13,7 @@ cp .env.example .env      # optional — sets paths, port, PUID/PGID, timezone
 docker compose up -d --build
 ```
 
-Open **http://localhost:8067** and sign in. On first run the app creates an `admin` account: set `ADMIN_PASSWORD` in `.env`, or leave it blank and it prints a generated one once to `docker compose logs ao3-downloader`.
+Open **http://localhost:8067** and sign in. On first run the app creates an `admin` account: set `ADMIN_PASSWORD` in `.env`, or leave it blank and it prints a generated one once to `docker compose logs ficfetch`.
 
 Every setting has a default, so it runs straight after a clone even without `.env`. `.env` is git-ignored, so `git pull` never overwrites your local settings — handy when the same repo runs on a laptop and a NAS.
 
@@ -44,7 +48,7 @@ Every page and endpoint is behind a login. Two roles: **admin** (full access, in
 
 - Set `ADMIN_PASSWORD` before the first start (read only while the database is empty), or leave it blank for a generated one in the logs.
 - Forgot it? Set `ADMIN_PASSWORD_RESET` in `.env`, restart, then blank it again.
-- Offline: `docker compose exec --user appuser ao3-downloader python -m app.adminctl reset-password <user> <pass>`. The `--user appuser` matters — `exec` otherwise runs as root and leaves database files the app can't write.
+- Offline: `docker compose exec --user appuser ficfetch python -m app.adminctl reset-password <user> <pass>`. The `--user appuser` matters — `exec` otherwise runs as root and leaves database files the app can't write.
 
 **SSO (OIDC)** — configure under **System → Settings**, no restart. Works with Authentik, Keycloak, or any OIDC provider: create an app there, copy the **Redirect URI** shown on the page (mind the scheme), then enter the issuer, client ID and secret and enable it. The first SSO login creates a local `user` account — grant admin afterwards. Logout is local only. If you run behind a reverse proxy, read [SSO behind a reverse proxy](#sso-behind-a-reverse-proxy-eg-authentik-on-a-nas) below.
 

@@ -39,7 +39,7 @@ def seed_admin(db_path: Path) -> None:
     if generated:
         _banner(
             [
-                "AO3 Downloader — first run: administrator account created",
+                "FicFetch — first run: administrator account created",
                 "",
                 f"  username: {username}",
                 f"  password: {password}",

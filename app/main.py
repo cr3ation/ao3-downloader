@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     await client.close()
 
 
-app = FastAPI(title="AO3 Downloader", lifespan=lifespan)
+app = FastAPI(title="FicFetch", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.include_router(routes_auth.router)
 app.include_router(routes_system.router)
