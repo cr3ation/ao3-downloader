@@ -46,7 +46,7 @@ Every page and endpoint is behind a login. Two roles: **admin** (full access, in
 - Forgot it? Set `ADMIN_PASSWORD_RESET` in `.env`, restart, then blank it again.
 - Offline: `docker compose exec --user appuser ao3-downloader python -m app.adminctl reset-password <user> <pass>`. The `--user appuser` matters — `exec` otherwise runs as root and leaves database files the app can't write.
 
-**SSO (OIDC)** — configure under **System → Settings**, no restart. Works with Authentik, Keycloak, or any OIDC provider: create an app there, copy the **Redirect URI** shown on the page (mind the scheme), then enter the issuer, client ID and secret and enable it. The first SSO login creates a local `user` account — grant admin afterwards. Behind a reverse proxy, set `FORWARDED_ALLOW_IPS` or `PUBLIC_BASE_URL` if the redirect URI comes out `http://`. Logout is local only.
+**SSO (OIDC)** — configure under **System → Settings**, no restart. Works with Authentik, Keycloak, or any OIDC provider: create an app there, copy the **Redirect URI** shown on the page (mind the scheme), then enter the issuer, client ID and secret and enable it. The first SSO login creates a local `user` account — grant admin afterwards. Logout is local only. If you run behind a reverse proxy, read [SSO behind a reverse proxy](#sso-behind-a-reverse-proxy-eg-authentik-on-a-nas) below.
 
 **Security** — over plain HTTP on a LAN the password and session cookie travel in cleartext: fine at home, not on the internet. If you expose the app, use HTTPS and set `SESSION_COOKIE_SECURE=true`. (The default `auto` marks the cookie `Secure` only over HTTPS; forcing `true` on plain HTTP silently breaks login.)
 
@@ -67,6 +67,30 @@ Set via `.env` — see [`.env.example`](.env.example) for the full annotated lis
 | `EPUB_TAG` | `Fanfiction` | Tag embedded in EPUBs; empty disables |
 
 Rate-limit tuning (`AO3_MIN_DELAY`, `MAX_RETRIES`, …) and the internal container paths live in `.env.example`.
+
+## SSO behind a reverse proxy (e.g. Authentik on a NAS)
+
+A common setup: this app and [Authentik](https://goauthentik.io/) both run on your NAS, reached from outside over HTTPS through a reverse proxy. Two things need care — the **redirect URI** and the **issuer URL**.
+
+**1. Tell the app its public URL.** The redirect URI is derived from the incoming request, so behind a TLS-terminating proxy the app otherwise sees `http://` and its internal host. Pin it in `.env`:
+
+```bash
+PUBLIC_BASE_URL=https://ao3.example.com
+SESSION_COOKIE_SECURE=true
+```
+
+`PUBLIC_BASE_URL` forces the redirect URI to `https://ao3.example.com/auth/oidc/callback` regardless of proxy headers. (The alternative is to leave it unset and set `FORWARDED_ALLOW_IPS` to the proxy's IP — or `*` on a trusted network — so uvicorn trusts `X-Forwarded-Proto`; `PUBLIC_BASE_URL` is the more predictable of the two.) Open **System → Settings** and check that the Redirect URI shown there now reads `https://…` — if it still shows `http://` or an internal host, the above isn't taking effect.
+
+**2. In Authentik**, create an **OAuth2/OpenID Provider** and an **Application**:
+
+- **Redirect URI:** exactly what the Settings page shows — `https://ao3.example.com/auth/oidc/callback`.
+- Note the **Client ID**, **Client secret**, and the provider's **issuer URL** (Authentik shows it as `https://auth.example.com/application/o/<app-slug>/`).
+
+**3. In the app** (System → Settings), enter that **issuer URL**, the client ID and secret, tick **Enable SSO**, and save.
+
+**Use the external issuer URL even though Authentik is local.** The app fetches discovery, tokens and signing keys server-side, and it checks that the token's `iss` matches the issuer you entered — and Authentik stamps `iss` with its *external* URL. An internal shortcut like `http://authentik:9000/…` would fail that check. So the app's container must be able to reach `https://auth.example.com`; on some NAS setups that means split-DNS or hairpin NAT, and if discovery fails this is usually why.
+
+Once saved, a **Log in with SSO** button appears on the login page, and the first SSO login creates a `user`-role account you can promote under Accounts.
 
 ## Notes & limitations
 
