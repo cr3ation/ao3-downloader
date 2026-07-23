@@ -62,6 +62,56 @@ class ItemStatus(str, Enum):
     error = "error"
 
 
+@dataclass(frozen=True)
+class User:
+    id: int
+    username: str
+    password_hash: str | None
+    role: str  # 'user' | 'admin'
+    provider: str  # 'local' | 'oidc'
+    subject: str | None
+    created_at: str
+    last_login_at: str | None
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+
+
+@dataclass(frozen=True)
+class Session:
+    token_hash: str
+    user_id: int
+    csrf_token: str
+    created_at: str
+    expires_at: str
+    last_used_at: str
+    user_agent: str | None
+
+
+@dataclass(frozen=True)
+class OidcState:
+    state: str
+    nonce: str
+    code_verifier: str
+    redirect_uri: str
+    next_path: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class OidcConfig:
+    enabled: bool
+    client_id: str
+    client_secret: str
+    issuer: str
+    scopes: str
+
+    @property
+    def usable(self) -> bool:
+        return self.enabled and bool(self.client_id) and bool(self.issuer)
+
+
 @dataclass
 class JobItem:
     work: Work

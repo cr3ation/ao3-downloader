@@ -30,9 +30,49 @@
     </header>
 
     <!-- Tabs -->
-    <nav class="flex gap-1 border-b border-slate-800">
-      <button data-tab="search" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-500 text-white">Search</button>
-      <button data-tab="library" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Library</button>
+    <nav class="flex items-center justify-between gap-4 border-b border-slate-800">
+      <div class="flex gap-1">
+        <button data-tab="search" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-500 text-white">Search</button>
+        <button data-tab="library" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200">Library</button>
+      </div>
+      <div class="flex items-center gap-1 pb-2">
+        <div class="relative">
+          <button id="user-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"
+                  class="grid place-items-center h-8 w-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold uppercase hover:bg-indigo-600/30 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  title="{{ user.username }}">{{ user.username[0]|upper }}</button>
+
+          <div id="user-menu" role="menu" aria-labelledby="user-menu-btn"
+               class="hidden absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50">
+            <div class="flex items-center gap-2.5 px-3 py-2.5">
+              <span class="grid place-items-center h-8 w-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold uppercase shrink-0">{{ user.username[0]|upper }}</span>
+              <div class="min-w-0">
+                <div class="text-sm text-slate-200 truncate">{{ user.username }}</div>
+                <div class="text-xs text-slate-500">{% if user.is_admin %}Administrator{% else %}User{% endif %}</div>
+              </div>
+            </div>
+            <div class="border-t border-slate-800 my-1"></div>
+            <form method="post" action="/logout" role="none">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" role="menuitem"
+                      class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800/60">
+                <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Log out
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {% set gear %}<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>{% endset %}
+        {% if user.is_admin %}
+        <a href="/system/accounts" title="System settings"
+           class="grid place-items-center h-8 w-8 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/60">{{ gear }}</a>
+        {% else %}
+        <span title="Only administrators can access system settings"
+              class="grid place-items-center h-8 w-8 rounded-md text-slate-600 opacity-50 cursor-not-allowed">{{ gear }}</span>
+        {% endif %}
+      </div>
     </nav>
 
     <!-- ============================== SEARCH TAB ============================== -->
@@ -257,6 +297,6 @@
     </section>
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ app_js_version }}"></script>
 </body>
 </html>
