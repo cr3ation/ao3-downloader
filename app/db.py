@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS users (
     provider      TEXT    NOT NULL DEFAULT 'local',
     subject       TEXT,
     created_at    TEXT    NOT NULL,
-    last_login_at TEXT
+    last_login_at TEXT,
+    cover_style   TEXT    NOT NULL DEFAULT 'hybrid'
 );
 
 -- Partial: most rows have subject NULL and those must not collide.
@@ -72,6 +73,19 @@ def _connect(db_path: Path) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """Idempotent ALTER TABLE ... ADD COLUMN — the one migration primitive.
+
+    CREATE TABLE IF NOT EXISTS never touches an existing table, so a column added
+    to SCHEMA after a database already exists would otherwise never appear. Runs
+    on every startup and is a no-op once the column is present. SQLite backfills
+    existing rows with the NOT NULL DEFAULT constant.
+    """
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def init_db(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with _connect(db_path) as conn:
@@ -81,6 +95,8 @@ def init_db(db_path: Path) -> None:
         if mode.lower() != "wal":
             print(f"[db] WAL unavailable on this filesystem (journal_mode={mode}); using the default journal.")
         conn.executescript(SCHEMA)
+        # Migrations for databases created before a column existed.
+        _ensure_column(conn, "users", "cover_style", "TEXT NOT NULL DEFAULT 'hybrid'")
 
 
 # ---------------------------------------------------------------- users
@@ -96,6 +112,7 @@ def _to_user(row: sqlite3.Row) -> User:
         subject=row["subject"],
         created_at=row["created_at"],
         last_login_at=row["last_login_at"],
+        cover_style=row["cover_style"],
     )
 
 
@@ -170,6 +187,11 @@ def set_password_hash(db_path: Path, user_id: int, password_hash: str | None) ->
 def set_role(db_path: Path, user_id: int, role: str) -> None:
     with _connect(db_path) as conn:
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+
+
+def set_cover_style(db_path: Path, user_id: int, cover_style: str) -> None:
+    with _connect(db_path) as conn:
+        conn.execute("UPDATE users SET cover_style = ? WHERE id = ?", (cover_style, user_id))
 
 
 def link_subject(db_path: Path, user_id: int, subject: str) -> None:

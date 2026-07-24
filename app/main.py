@@ -7,11 +7,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import db, routes_auth, routes_system, scraper
+from . import covers, db, routes_auth, routes_prefs, routes_system, scraper
 from .ao3_client import AO3Client, AO3Error
 from .auth import AuthMiddleware
 from .bootstrap import apply_password_reset, seed_admin
@@ -94,6 +94,7 @@ app = FastAPI(title="FicFetch", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 app.include_router(routes_auth.router)
 app.include_router(routes_system.router)
+app.include_router(routes_prefs.router)
 # Added last so it runs first: every route above is protected unless it is
 # explicitly listed in auth.PUBLIC_PATHS.
 app.add_middleware(AuthMiddleware, db_path=Settings.from_env().db_path)
@@ -161,8 +162,24 @@ async def api_download(req: EnqueueRequest, request: Request) -> dict:
         raise HTTPException(status_code=400, detail="Category must not be empty.")
 
     manager: DownloadManager = request.app.state.manager
-    job = manager.enqueue(req.works, req.format, req.category.strip())
+    # Cover style is a per-user preference, sourced server-side rather than
+    # trusted from the request body.
+    job = manager.enqueue(
+        req.works, req.format, req.category.strip(), request.state.user.cover_style
+    )
     return {"job_id": job.job_id, "queued": len(job.items)}
+
+
+@app.get("/api/cover-preview/{style}")
+async def api_cover_preview(style: str) -> Response:
+    """Render the sample cover for a style — drives the /preferences gallery."""
+    if style not in covers.ALLOWED_STYLES:
+        raise HTTPException(status_code=404, detail="Unknown cover style.")
+    return Response(
+        content=covers.generate_preview(style),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/jobs")

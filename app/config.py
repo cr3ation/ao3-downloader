@@ -33,6 +33,7 @@ class Settings:
     max_pages: int
     epub_tag: str
     flat_downloads: bool
+    cover_generation_enabled: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -63,4 +64,6 @@ class Settings:
             max_pages=int(os.getenv("MAX_PAGES", "50")),
             epub_tag=os.getenv("EPUB_TAG", "Fanfiction").strip(),
             flat_downloads=os.getenv("FLAT_DOWNLOADS", "false").strip().lower() in ("1", "true", "yes"),
+            cover_generation_enabled=os.getenv("COVER_GENERATION_ENABLED", "true").strip().lower()
+            in ("1", "true", "yes"),
         )

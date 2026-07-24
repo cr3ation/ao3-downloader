@@ -17,7 +17,15 @@ from .ao3_client import AO3Client, AO3Error, RestrictedWorkError
 from .config import Settings
 from .events import EventBus
 from .models import ItemStatus, Job, JobItem, Work
-from .utils import add_epub_subject, atomic_write_bytes, atomic_write_text, sanitize_filename
+from .covers import generate_cover
+from .utils import (
+    add_epub_cover,
+    add_epub_subject,
+    atomic_write_bytes,
+    atomic_write_text,
+    epub_has_cover,
+    sanitize_filename,
+)
 
 METADATA_FILE = "metadata.json"
 
@@ -84,11 +92,12 @@ class DownloadManager:
             except asyncio.CancelledError:
                 pass
 
-    def enqueue(self, works: list[Work], fmt: str, category: str) -> Job:
+    def enqueue(self, works: list[Work], fmt: str, category: str, cover_style: str = "hybrid") -> Job:
         job = Job(
             job_id=uuid.uuid4().hex[:8],
             category=category,
             format=fmt,
+            cover_style=cover_style,
             items=[JobItem(work=w) for w in works],
         )
         self._jobs[job.job_id] = job
@@ -184,6 +193,18 @@ class DownloadManager:
                     data = add_epub_subject(data, self._settings.epub_tag)
                 except Exception as exc:
                     self._bus.log("warning", f"Could not embed tag in EPUB for {work.title}: {exc}")
+
+            if (
+                job.format == "epub"
+                and self._settings.cover_generation_enabled
+                and job.cover_style != "none"
+            ):
+                # Only when the EPUB brings no cover of its own — never overwrite one.
+                try:
+                    if not epub_has_cover(data):
+                        data = add_epub_cover(data, generate_cover(work, job.cover_style))
+                except Exception as exc:
+                    self._bus.log("warning", f"Could not generate cover for {work.title}: {exc}")
 
             atomic_write_bytes(path, data)
             self._update_metadata(meta_folder, work, path.name, job.format)

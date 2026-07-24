@@ -25,6 +25,7 @@ services:
       MAX_PAGES: "${MAX_PAGES:-50}"
       EPUB_TAG: "${EPUB_TAG:-Fanfiction}"
       FLAT_DOWNLOADS: "${FLAT_DOWNLOADS:-true}"
+      COVER_GENERATION_ENABLED: "${COVER_GENERATION_ENABLED:-true}"
       # Accounts & sessions. ADMIN_* are used only to seed the first account.
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"

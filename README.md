@@ -26,6 +26,12 @@ Every setting has a default, so it runs straight after a clone even without `.en
 
 **Library tab** — lists everything downloaded (from `./config/metadata.json`), filterable and sortable. Files still on disk offer **Download** and **Delete**; works Calibre has already imported are marked **Imported** and offer **Forget**, which drops the record so the work can be fetched again.
 
+## Book covers
+
+AO3 works ship as plain text with no cover, so FicFetch renders a graphically pleasing one for each **EPUB** download — centred on the title and author, with colours seeded from the title so every book looks distinct and the same work always produces the same cover. Calibre reads the embedded cover on import, so it becomes the thumbnail on your e-reader.
+
+Each account picks its own look under the avatar menu → **Preferences**: four styles shown as a live preview gallery — **Hybrid** (the default), **Bold gradient**, **Editorial**, and **Generative art** — or **None** to leave the AO3 file untouched. An EPUB that already carries its own cover is never overwritten, and covers apply to new EPUB downloads only. Set `COVER_GENERATION_ENABLED=false` to turn the whole feature off.
+
 ## Calibre integration
 
 Point the app's download folder at Calibre's auto-add watch folder and every work flows straight in, tagged `Fanfiction`.
@@ -69,6 +75,7 @@ Set via `.env` — see [`.env.example`](.env.example) for the full annotated lis
 | `SESSION_COOKIE_SECURE` | `auto` | Set `true` behind HTTPS |
 | `FLAT_DOWNLOADS` | `true` | Files in the root (required for Calibre) |
 | `EPUB_TAG` | `Fanfiction` | Tag embedded in EPUBs; empty disables |
+| `COVER_GENERATION_ENABLED` | `true` | Auto-generate EPUB covers; per-user style under Preferences |
 
 Rate-limit tuning (`AO3_MIN_DELAY`, `MAX_RETRIES`, …) and the internal container paths live in `.env.example`.
 
@@ -110,6 +117,7 @@ Behind the same session cookie as the UI:
 
 - `POST /api/search`, `POST /api/download`
 - `GET /api/downloads`, `GET`/`DELETE /api/downloads/{category}/{filename}`
+- `GET /api/cover-preview/{style}` — sample cover JPEG for the Preferences gallery
 - `GET /api/events` — SSE stream (log, progress, item_done, job_done)
 
 ## Respect creators
