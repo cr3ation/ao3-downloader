@@ -72,6 +72,7 @@ class User:
     subject: str | None
     created_at: str
     last_login_at: str | None
+    cover_style: str = "hybrid"
 
     @property
     def is_admin(self) -> bool:
@@ -126,6 +127,7 @@ class Job:
     category: str
     format: str
     items: list[JobItem]
+    cover_style: str = "hybrid"
     state: str = "queued"  # queued | running | finished
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -141,6 +143,7 @@ class Job:
             "state": self.state,
             "category": self.category,
             "format": self.format,
+            "cover_style": self.cover_style,
             "total": len(self.items),
             "counts": self.counts(),
             "created_at": self.created_at.isoformat(),
